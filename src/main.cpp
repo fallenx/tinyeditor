@@ -1,4 +1,4 @@
-//TinyCodeEditor
+//TinyEditor
 //Copyright (C) 2023
 //
 //Author Fallen_x
