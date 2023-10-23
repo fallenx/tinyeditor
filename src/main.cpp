@@ -1,4 +1,4 @@
-//TinyEditor
+//TinyCodeEditor
 //Copyright (C) 2023
 //
 //Author Fallen_x
@@ -254,7 +254,6 @@ SDL_Surface* prepare_font_atlas(int font_size, int *w, int *h, int *font_ascent,
     SDL_Surface *source = TTF_RenderUTF8_Blended(my_font, my_string.c_str(), {230, 230, 230});
 
     TTF_SizeUTF8(my_font, my_string.c_str(), w, h);
-
 
     uint32_t count = 0;
     int32_t main_cnt = 0;
@@ -3261,6 +3260,9 @@ int SDL_main(int argc, char *argv[]) {
                             char *t_del = SDL_GetClipboardText();
                             char *tt_del = t_del;
 
+                            //per_buffer += t_del;
+
+
                             if(step_count == 1) {
 
                                 while(*tt_del){
@@ -3276,18 +3278,20 @@ int SDL_main(int argc, char *argv[]) {
 
                                 while(*tt_del){
 
-                                    if(*tt_del == '\n') {
+                                    if(*tt_del == '\r') {
+                                        per_buffer += *tt_del++;
+                                        per_buffer += *tt_del++;
+                                    }else if(*tt_del == '\n') {
                                         per_buffer += '\r';
-                                        per_buffer += *tt_del;
+                                        per_buffer += *tt_del++;
                                     }else
-                                        per_buffer += *tt_del;
-
-                                    tt_del++;
+                                        per_buffer += *tt_del++;
 
                                 }
 
-
                             }
+
+                            paste_board.push_back({t_start, per_buffer.size(), true});
 
                             SDL_free(t_del);
                         }
@@ -3325,9 +3329,9 @@ int SDL_main(int argc, char *argv[]) {
                     for(auto i : del_me2)
                         std::cout << i._start << " " << i._end << " " << i.append << std::endl;
                     std::cout << "From Paste*******\n";
-*/
-                   // std::cout << "[Paste] it_cp = " << it_cp->_start << " " << it_cp->_end << " " << char_pos << std::endl;
 
+                    std::cout << "[Paste] it_cp = " << it_cp->_start << " " << it_cp->_end << " " << char_pos << std::endl;
+*/
                     sel_cp = it_cp;
                     sel_end_cp = it_cp;
                     sel_char = char_pos;
@@ -8523,7 +8527,6 @@ TEST_CP:                        while(++it_cp != del_me2.end() && !it_cp->append
                     }
 
                 }
-
 
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
