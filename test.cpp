@@ -11,12 +11,14 @@ int main(int argc, char *argv[]) {
 
     std::map<size_t, std::string> my_map;
 
-    size_t _cnt = 0;
+    size_t mn_cnt = 0;
 
-    while(_cnt < my_string.size()) {
-            my_map[_cnt] = my_string.substr(_cnt, UTF8_CHAR_LEN(my_string[_cnt]));
-            _cnt += UTF8_CHAR_LEN(my_string[_cnt]);
-    }
+    for(size_t _cnt = 0; _cnt < my_string.size(); _cnt += UTF8_CHAR_LEN(my_string[_cnt]))
+        my_map[mn_cnt++] = my_string.substr(_cnt, UTF8_CHAR_LEN(my_string[_cnt]));
+
+    //for(auto i : my_map)
+    //    std::cout << i.second << " ";
+
 
     enum {INSERT, LEFT, RIGHT, UNDO, REDO};
 
@@ -24,9 +26,9 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    for(int test_count = 0; test_count < 10000000; test_count++) {
+    for(int test_count = 0; test_count < 1000000; test_count++) {
 
-        if(!(test_count % 10000))
+        if(!(test_count % 1000))
             std::cout << "Table Size " << my_model.piece_map.size() << "\n";
 
         switch(rand() % 5) {
@@ -36,20 +38,11 @@ int main(int argc, char *argv[]) {
 
                     //std::cout << "Insert\n";
 
-                    int _length = rand() % 6 + 1;
+                    int _length = rand() % 10 + 1;
                     std::string to_insert;
 
-                    for(int i = 0; i < _length; i++) {
-
-                        size_t _rnd = rand() % my_string.size() + 1;
-
-                        //while(((my_string[--_rnd] & 0x80) != 0) && ((my_string[_rnd] & 0xC0) != 0xC0));
-
-                        //auto it = my_map.lower_bound(_rnd);
-
-                        to_insert += (my_map.lower_bound(_rnd))->second;
-
-                    }
+                    for(int i = 0; i < _length; i++)
+                        to_insert += my_map[rand() % my_map.size()];
 
                     my_model.insert_text(to_insert);
                 }
@@ -58,18 +51,21 @@ int main(int argc, char *argv[]) {
 
             case LEFT:
                 //std::cout << "Left\n";
-                my_model.left();
+                for(int i= 0; i < rand() % 20 + 1;i++)
+                    my_model.left();
                 break;
 
             case RIGHT:
                 //std::cout << "Right\n";
-                my_model.right();
+                for(int i= 0; i < rand() % 30 + 1; i++)
+                    my_model.right();
                 break;
 
             case UNDO:
                 //std::cout << "[Undo] ";
                 //my_model.print_at();
-                my_model.undo();
+                for(int i= 0; i < rand() % 5 + 1; i++)
+                    my_model.undo();
                 break;
 
             case REDO:
@@ -83,6 +79,8 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Table Size " << my_model.piece_map.size() << "\n";
     std::cout << "Buffer Size " << my_model.buffer.size() << "\n";
+
+    //my_model.printbuffer();
 
 
     //my_model.printbuffer();
