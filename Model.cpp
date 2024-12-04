@@ -41,7 +41,6 @@ void Model::undo() {
 
             case INSERT:
 
-                //it = piece_map.erase(temp.it);
                 it = piece_map.erase(deleted_list[temp.piece.offset]);
 
                 if(it != piece_map.begin()) {
@@ -65,12 +64,22 @@ void Model::undo() {
 
             case DELETE:
 
-                it = deleted_list[temp.piece.offset];
+                if(temp.piece.length){
+
+                    it = piece_map.erase(deleted_list[temp.piece.offset]);
+                }else
+                    it = deleted_list[temp.piece.offset];
+
+                temp = undo_list.back();
+                undo_list.pop_back();
+
+                it->offset -= temp.piece.length;
+                it->length += temp.piece.length;
                 Pos = temp.piece.length;
 
-                std::cout << "Delete " << it->offset << " " << Pos << "\n";
+                deleted_list[it->offset] = it;
 
-                reinsert({Pos, next()});
+                std::cout << "Delete " << it->offset << " " << Pos << "\n";
 
                 break;
         }
@@ -116,6 +125,7 @@ bool Model::delete_text() {
     if(Pos) {
 
         redo_list.resize(0);
+        undo_list.push_back({DELETE, {it->offset, Pos}});
 
         if(Pos < it->length) {
             std::pair<size_t, size_t> old_piece(it->offset, Pos);
@@ -151,6 +161,10 @@ bool Model::delete_text() {
 
             }else
                 Pos = 0;
+
+            undo_list.push_back({DELETE, {it->offset, Pos}});
+            deleted_list[it->offset] = it;
+
         }else
             it->length = Pos;
 
@@ -222,7 +236,8 @@ void Model::printbuffer() {
 
 void Model::print_at() {
 
-    std::cout << "[" << buffer.substr(it->offset, it->length) << "] Pos: " << Pos << "\n";
+    if(piece_map.size())
+        std::cout << "[" << buffer.substr(it->offset, it->length) << "] Pos: " << Pos << "\n";
 }
 
 
