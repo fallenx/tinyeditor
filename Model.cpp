@@ -64,22 +64,8 @@ void Model::undo() {
 
             case DELETE:
 
-                if(temp.piece.length){
+                std::cout << (deleted_list[temp.piece.offset])->offset << " " << (deleted_list[temp.piece.offset])->length << "\n";
 
-                    it = piece_map.erase(deleted_list[temp.piece.offset]);
-                }else
-                    it = deleted_list[temp.piece.offset];
-
-                temp = undo_list.back();
-                undo_list.pop_back();
-
-                it->offset -= temp.piece.length;
-                it->length += temp.piece.length;
-                Pos = temp.piece.length;
-
-                deleted_list[it->offset] = it;
-
-                std::cout << "Delete " << it->offset << " " << Pos << "\n";
 
                 break;
         }
@@ -142,7 +128,7 @@ bool Model::delete_text() {
             }
 
             undo_list.push_back({DELETE, {it->offset, Pos}});
-            deleted_list[it->offset] = it;
+            //deleted_list[it->offset] = it;
 
         }else if(!prev()) {
 
