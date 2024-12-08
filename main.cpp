@@ -9,7 +9,6 @@
 #define _Cursor_Delay 450
 #define _Tab_Width 4
 
-
 inline int UTF8_CHAR_LEN(char byte) {return byte == 0x0d ? 2 : (( 0xE5000000 >> (( byte >> 3 ) & 0x1e )) & 3 ) + 1; }
 
 typedef struct {int32_t x; int32_t y;} __cursor;
@@ -290,11 +289,8 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
-                if(my_table.delete_text())
+                if(my_table.delete_text(false))
                     cr1.x -= s_w;
-
-                my_table.printbuffer();
-
 
                 _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
 

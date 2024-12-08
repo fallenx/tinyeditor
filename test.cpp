@@ -20,65 +20,97 @@ int main(int argc, char *argv[]) {
     //    std::cout << i.second << " ";
 
 
-    enum {INSERT, LEFT, RIGHT, UNDO, REDO};
+    enum {INSERT, LEFT, RIGHT, UNDO, REDO, DELETE};
 
-    Model my_model;
 
     srand(time(NULL));
 
-    for(int test_count = 0; test_count < 1000000; test_count++) {
+    for(;;) {
 
-        if(!(test_count % 1000))
-            std::cout << "Table Size " << my_model.piece_map.size() << "\n";
+        Model my_model;
+        std::cout << "----------Start-------------------\n";
 
-        switch(rand() % 5) {
+        for(int test_count = 0; test_count < 50; test_count++) {
 
-            case INSERT:
-                {
 
-                    //std::cout << "Insert\n";
+            //if(!(test_count % 1000))
+            //    std::cout << "Table Size " << my_model.piece_map.size() << "\n";
 
-                    int _length = rand() % 10 + 1;
-                    std::string to_insert;
+            switch(rand() % 6) {
 
-                    for(int i = 0; i < _length; i++)
-                        to_insert += my_map[rand() % my_map.size()];
+                case INSERT:
+                    {
 
-                    my_model.insert_text(to_insert);
-                }
+                        std::cout << "Insert\n";
 
-                break;
+                        int _length = rand() % 10 + 1;
+                        std::string to_insert;
 
-            case LEFT:
-                //std::cout << "Left\n";
-                for(int i= 0; i < rand() % 20 + 1;i++)
-                    my_model.left();
-                break;
+                        for(int i = 0; i < _length; i++)
+                            to_insert += my_map[67 + rand() % 25];
 
-            case RIGHT:
-                //std::cout << "Right\n";
-                for(int i= 0; i < rand() % 30 + 1; i++)
-                    my_model.right();
-                break;
+                        my_model.insert_text(to_insert);
+                        my_model.print_at();
+                        my_model.printbuffer();
+                    }
 
-            case UNDO:
-                //std::cout << "[Undo] ";
-                //my_model.print_at();
-                for(int i= 0; i < rand() % 5 + 1; i++)
-                    my_model.undo();
-                break;
+                    break;
 
-            case REDO:
-                //std::cout << "Redo\n";
-                my_model.redo();
-                break;
+                case LEFT:
+
+                    for(int i= 0; i < rand() % 10 + 1;i++) {
+                        std::cout << "Left\n";
+                        my_model.left();
+                        //my_model.print_at();
+                        //my_model.printbuffer();
+                    }
+                    break;
+
+                case RIGHT:
+
+                    for(int i= 0; i < rand() % 10 + 1; i++) {
+                        std::cout << "Right\n";
+                        my_model.right();
+                        //my_model.print_at();
+                        //my_model.printbuffer();
+                    }
+                    break;
+
+                case UNDO:
+                    for(int i= 0; i < rand() % 10 + 1; i++) {
+                        std::cout << "[Undo] \n";
+                        my_model.undo();
+                        my_model.print_at();
+                        my_model.printbuffer();
+                    }
+                    break;
+
+                case REDO:
+                    for(int i= 0; i < rand() % 10 + 1; i++) {
+                        std::cout << "Redo\n";
+                        my_model.redo();
+                        my_model.print_at();
+                        my_model.printbuffer();
+                    }
+                    break;
+
+                case DELETE:
+                    for(int i= 0; i < rand() % 20 + 1; i++) {
+                        std::cout << "Delete\n";
+                        my_model.delete_text(false);
+                        my_model.print_at();
+                        my_model.printbuffer();
+                    }
+                    break;
+
+            }
 
         }
 
-    }
+        std::cout << "Table Size " << my_model.piece_map.size() << "\n";
+        std::cout << "Buffer Size " << my_model.buffer.size() << "\n";
 
-    std::cout << "Table Size " << my_model.piece_map.size() << "\n";
-    std::cout << "Buffer Size " << my_model.buffer.size() << "\n";
+    }
 
     //my_model.printbuffer();
 
