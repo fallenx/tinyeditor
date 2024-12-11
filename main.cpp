@@ -43,7 +43,7 @@ SDL_Surface* prepare_font_atlas(int font_size, int *w, int *h, int *font_ascent,
     std::string my_string = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
     my_string += "ÇĞİÖŞÜçğıöşü"; /// Turkish
     my_string += "АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя"; /// Russian
-    my_string += "«»’“”"; /// Specials
+    my_string += "«»’©"; /// Specials
 
     SDL_Surface *source = TTF_RenderUTF8_Blended(my_font, my_string.c_str(), {29, 242, 10});
 
@@ -342,14 +342,18 @@ int SDL_main(int argc, char *argv[]) {
 
             std::string t1 = e.text.text;
 
-            my_table.insert_text(t1);
+            size_t _count = 0;
 
+            while(_count < t1.size()) {
 
-            if((cr1.x += s_w) >= _width) {
-                cr1.x = 0;
-                cr1.y += _cur_height;
+                my_table.insert_text(t1.substr(_count, UTF8_CHAR_LEN(t1[_count])));
+                _count += UTF8_CHAR_LEN(t1[_count]);
+
+                if((cr1.x += s_w) >= _width) {
+                    cr1.x = 0;
+                    cr1.y += _cur_height;
+                }
             }
-
 
             _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
 
