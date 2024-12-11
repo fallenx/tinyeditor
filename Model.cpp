@@ -23,7 +23,10 @@ void Model::redo() {
                     it = piece_map.begin();
 
                 Pos = temp.Pos;
+
                 reinsert(temp.piece, true);
+
+
 
                 break;
 
@@ -33,6 +36,7 @@ void Model::redo() {
                 Pos = temp.Pos;
 
                 delete_text(true);
+
 
                 break;
         }
@@ -53,33 +57,13 @@ void Model::undo() {
                 it = deleted_list[temp.piece.offset];
                 Pos = temp.piece.length;
 
-                std::cout << "it " << it->offset << " " << Pos << "\n";
+                delete_text(true);
 
-                print_at();
-                printbuffer();
+                undo_list.pop_back();
+                temp = undo_list.back();
+                undo_list.pop_back();
 
-                delete_text(false);
-
-/*
-                if(it != piece_map.begin()) {
-
-                    std::pair<size_t,size_t> old_ones (it->offset, it->length);
-                    if(it != piece_map.end() && (--it)->offset + it->length == old_ones.first) {
-                        Pos = it->length;
-                        it->length += old_ones.second;
-                        it = piece_map.erase(++it);
-                        --it;
-                    }else
-                        Pos = it == piece_map.end() ? (--it)->length : it->length;
-
-                }else
-                    Pos = 0;
-
-                */
-
-                redo_list.push_back({INSERT, Pos, it->offset, temp.piece});
-
-                //deleted_list[it->offset] = it;
+                redo_list.push_back({INSERT, Pos, it->offset, {temp.piece.offset, temp.piece.length}});
 
                 break;
 
@@ -176,13 +160,13 @@ bool Model::delete_text(bool from_redo=false) {
             }
 
         }else{
+
             undo_list.push_back({DELETE, {it->offset + Pos, next()}});
             it->length = Pos;
         }
 
         undo_list.push_back({DELETE, {it->offset, Pos}});
         deleted_list[it->offset] = it;
-
 
         return true;
     }
@@ -201,8 +185,6 @@ void Model::insert_text(std::string text) {
     if(Pos && it->offset + Pos == old_size) { // Consecutive Modification
         it->length += text.size();
         undo_list.push_back({INSERT, {it->offset, it->length}});
-        //deleted_list[it->offset] = it;
-        //undo_list.back().piece.length = it->length;
     }else {
         if(Pos && Pos < it->length) { /// Middle Insertion
 
@@ -222,15 +204,14 @@ void Model::insert_text(std::string text) {
 
     Pos = it->length;
 
-    print_at();
-    printbuffer();
-
 }
 
 void Model::reinsert(Piece piece, bool from_redo) {
 
     if(Pos && it->offset + Pos == piece.offset) { // Consecutive Modification
         it->length += next();
+        if(from_redo)
+            undo_list.push_back({INSERT, {it->offset, it->length}});
         std::pair<size_t, size_t> old_piece(it->offset, it->length);
 
         if(++it != piece_map.end() && it->offset == old_piece.first + old_piece.second) {

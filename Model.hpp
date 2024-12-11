@@ -30,9 +30,9 @@ class Model {
     void redo();
     bool left();
     bool right();
-    bool delete_text();
+    bool delete_text(bool);
     void insert_text(std::string);
-    void reinsert(Piece);
+    void reinsert(Piece, bool);
     void printbuffer();
     void print_at();
 

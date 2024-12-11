@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     //    std::cout << i.second << " ";
 
 
-    enum {INSERT, LEFT, RIGHT, UNDO, REDO, DELETE};
+    enum {INSERT, LEFT, RIGHT, DELETE, UNDO, REDO};
 
 
     srand(time(NULL));
@@ -28,9 +28,9 @@ int main(int argc, char *argv[]) {
     for(;;) {
 
         Model my_model;
-        std::cout << "----------Start-------------------\n";
+        //std::cout << "----------Start-------------------\n";
 
-        for(int test_count = 0; test_count < 50; test_count++) {
+        for(int test_count = 0; test_count < 10000000; test_count++) {
 
 
             //if(!(test_count % 1000))
@@ -41,17 +41,16 @@ int main(int argc, char *argv[]) {
                 case INSERT:
                     {
 
-                        std::cout << "Insert\n";
 
-                        int _length = rand() % 10 + 1;
-                        std::string to_insert;
+                        for(int i= 0; i < rand() % 10 + 1;i++) {
+                            //std::cout << "Insert\n";
+                            std::string to_insert;
+                            to_insert += my_map[rand() % my_map.size()];
+                            my_model.insert_text(to_insert);
+                            //my_model.print_at();
+                            //my_model.printbuffer();
+                        }
 
-                        for(int i = 0; i < _length; i++)
-                            to_insert += my_map[67 + rand() % 25];
-
-                        my_model.insert_text(to_insert);
-                        my_model.print_at();
-                        my_model.printbuffer();
                     }
 
                     break;
@@ -59,7 +58,7 @@ int main(int argc, char *argv[]) {
                 case LEFT:
 
                     for(int i= 0; i < rand() % 10 + 1;i++) {
-                        std::cout << "Left\n";
+                        //std::cout << "Left\n";
                         my_model.left();
                         //my_model.print_at();
                         //my_model.printbuffer();
@@ -69,7 +68,7 @@ int main(int argc, char *argv[]) {
                 case RIGHT:
 
                     for(int i= 0; i < rand() % 10 + 1; i++) {
-                        std::cout << "Right\n";
+                        //std::cout << "Right\n";
                         my_model.right();
                         //my_model.print_at();
                         //my_model.printbuffer();
@@ -78,28 +77,28 @@ int main(int argc, char *argv[]) {
 
                 case UNDO:
                     for(int i= 0; i < rand() % 10 + 1; i++) {
-                        std::cout << "[Undo] \n";
+                        //std::cout << "[Undo] \n";
                         my_model.undo();
-                        my_model.print_at();
-                        my_model.printbuffer();
+                        //my_model.print_at();
+                        //my_model.printbuffer();
                     }
                     break;
 
                 case REDO:
                     for(int i= 0; i < rand() % 10 + 1; i++) {
-                        std::cout << "Redo\n";
+                        //std::cout << "Redo\n";
                         my_model.redo();
-                        my_model.print_at();
-                        my_model.printbuffer();
+                        //my_model.print_at();
+                        //my_model.printbuffer();
                     }
                     break;
 
                 case DELETE:
-                    for(int i= 0; i < rand() % 20 + 1; i++) {
-                        std::cout << "Delete\n";
+                    for(int i= 0; i < rand() % 10 + 1; i++) {
+                        //std::cout << "Delete\n";
                         my_model.delete_text(false);
-                        my_model.print_at();
-                        my_model.printbuffer();
+                        //my_model.print_at();
+                        //my_model.printbuffer();
                     }
                     break;
 
