@@ -4,7 +4,7 @@
 Model::Model() : it(piece_map.begin()), Pos(0) {}
 
 inline size_t Model::next() { return buffer[it->offset + Pos] == 0x0d ? 2 : (( 0xE5000000 >> (( buffer[it->offset + Pos] >> 3 ) & 0x1e )) & 3 ) + 1; }
-inline size_t Model::prev() { while(((buffer[it->offset + --Pos] & 0x80) != 0) && ((buffer[it->offset + Pos] & 0xC0) != 0xC0)); return Pos; }
+inline size_t Model::prev() { while(((buffer[it->offset + --Pos] & 0x80) != 0) && ((buffer[it->offset + Pos] & 0xC0) != 0xC0)); return buffer[it->offset + Pos] == 0x0A ? --Pos : Pos; }
 
 void Model::redo() {
 
@@ -14,30 +14,18 @@ void Model::redo() {
         redo_list.pop_back();
 
         switch(temp.type) {
-
             case INSERT:
-
                 if(temp.Pos)
                     it = deleted_list[temp.offset];
                 else
                     it = piece_map.begin();
-
                 Pos = temp.Pos;
-
                 reinsert(temp.piece, true);
-
-
-
                 break;
-
             case DELETE:
-
                 it = deleted_list[temp.offset];
                 Pos = temp.Pos;
-
                 delete_text(true);
-
-
                 break;
         }
     }
@@ -94,7 +82,6 @@ bool Model::left() {
         return true;
     }
     return false;
-
 }
 
 bool Model::right() {

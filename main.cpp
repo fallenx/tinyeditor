@@ -14,25 +14,6 @@ inline int UTF8_CHAR_LEN(char byte) {return byte == 0x0d ? 2 : (( 0xE5000000 >> 
 typedef struct {int32_t x; int32_t y;} __cursor;
 typedef struct {size_t offset; size_t length;} piece;
 
-void advance_cursor(__cursor *cr1, Model &my_table, int s_w) {
-
-    cr1->x = 0; cr1->y = 0;
-    if(my_table.piece_map.size()) {
-
-        auto it = my_table.piece_map.begin();
-
-        do{
-
-            size_t length = (it == my_table.it) ? (it->offset + my_table.Pos) : (it->offset + it->length);
-
-            for(size_t Pos = it->offset; Pos < length; Pos += UTF8_CHAR_LEN(my_table.buffer[Pos]))
-                cr1->x += s_w;
-
-        }while(it++ != my_table.it);
-
-    }else
-        cr1->x = 0;
-}
 
 SDL_Surface* prepare_font_atlas(int font_size, int *w, int *h, int *font_ascent, std::unordered_map<std::string, __cursor> &p_font_map) {
 
@@ -93,34 +74,56 @@ void _Render(
 
     SDL_FillRect(screen, NULL, key_color);
 
-    int t_x = 0, t_y = 0;
-
-
+    int t_x = x_offset, t_y = y_offset;
 
 
     for(auto it = my_table.piece_map.begin(); it != my_table.piece_map.end(); ++it) {
 
-            for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
+        for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
 
-                std::string tt_me = my_table.buffer.substr(it->offset + Pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos]));
+            std::string tt_me = my_table.buffer.substr(it->offset + Pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos]));
 
-                if(font_map.find(tt_me) != font_map.end()){
-                    SDL_Rect temp_font = {(int) font_map[tt_me].x, 0, s_w, s_h};
-                    SDL_Rect temp_rect = {t_x, t_y + font_ascent, s_w, s_h};
-                    SDL_BlitSurface(font_atlas, &temp_font, screen, &temp_rect);
-                }
-
-                t_x += s_w;
-                if( t_x > _width - s_w) {
-                    t_x = x_offset;
-                    t_y += (s_h + font_ascent);
-                }
-
+            if(font_map.find(tt_me) != font_map.end() && t_x >= 0 && t_x < _width){
+                SDL_Rect temp_font = {(int) font_map[tt_me].x, 0, s_w, s_h};
+                SDL_Rect temp_rect = {t_x, t_y + font_ascent, s_w, s_h};
+                SDL_BlitSurface(font_atlas, &temp_font, screen, &temp_rect);
             }
 
+            if(!tt_me.compare("\r\n")){
+                t_y += (s_h + font_ascent);
+                t_x = x_offset;
+            }else
+                t_x += s_w;
+        }
     }
 }
 
+void advance_cursor(__cursor *cr1, Model &my_table, int s_w, int _cur_height, int *x_offset, int *y_offset, int _width, int _height) { // to-do indentation
+
+    cr1->x = *x_offset; cr1->y = *y_offset;
+    if(my_table.piece_map.size()) {
+
+        auto it = my_table.piece_map.begin();
+
+        do{
+
+            size_t length = (it == my_table.it) ? (it->offset + my_table.Pos) : (it->offset + it->length);
+
+            for(size_t Pos = it->offset; Pos < length; Pos += UTF8_CHAR_LEN(my_table.buffer[Pos])) {
+                if(!my_table.buffer.substr(Pos, UTF8_CHAR_LEN(my_table.buffer[Pos])).compare("\r\n")){
+                    cr1->y += _cur_height;
+                    cr1->x = *x_offset = 0; // to-do indentation to go back
+                }else if((cr1->x += s_w) > (_width - s_w)) {
+                    cr1->x = _width - s_w;
+                    *x_offset -= s_w;
+                }
+            }
+
+        }while(it++ != my_table.it);
+
+    }else
+        cr1->x = 0;
+}
 
 int SDL_main(int argc, char *argv[]) {
 
@@ -128,8 +131,8 @@ int SDL_main(int argc, char *argv[]) {
     TTF_Init();
     std::unordered_map<std::string, __cursor> font_map;
     bool ctrl_pressed = false;
-    int s_w, s_h, font_ascent, _width = 900, _height = 800;   // 117 15
-    SDL_Surface *font_atlas = prepare_font_atlas(16, &s_w, &s_h, &font_ascent, font_map);
+    int s_w, s_h, font_ascent, _width = 600, _height = 600, x_offset = 0, y_offset = 0;   // 117 15
+    SDL_Surface *font_atlas = prepare_font_atlas(12, &s_w, &s_h, &font_ascent, font_map);
     int _cur_height = s_h + font_ascent, _cur_width = s_w;
     _height = (_height / (s_h + font_ascent) + 1) * (s_h + font_ascent);
     _width = (_width / s_w + 1) * s_w;
@@ -152,9 +155,6 @@ int SDL_main(int argc, char *argv[]) {
 
     SDL_Surface *Cursor = SDL_CreateRGBSurface(0, _cur_width , _cur_height, 32, 0xff, 0xff00, 0xff0000, 0xff000000);
     SDL_Surface *Temp_Surface = SDL_CreateRGBSurfaceWithFormat(0, Cursor->w , Cursor->h, 32, screen->format->format);
-
-
-    std::cout << "Pixel format = " << SDL_GetPixelFormatName((Cursor->format)->format) << std::endl;
 
 
     Uint32 Cursor_Color = SDL_MapRGBA(Cursor->format, 29, 242, 10, 180);
@@ -188,7 +188,7 @@ int SDL_main(int argc, char *argv[]) {
 
 
     SDL_Rect dest_rect = {cr1.x, cr1.y, _cur_width, _cur_height};
-    _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
+    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
     SDL_UpdateWindowSurface(my_test);
 
     for(;e.type != SDL_QUIT; SDL_PollEvent(&e)) {
@@ -242,8 +242,8 @@ int SDL_main(int argc, char *argv[]) {
                     }
 
                     my_table.undo();
-                    advance_cursor(&cr1, my_table, s_w);
-                    _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
+                    advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+                    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                     dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                     last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -259,8 +259,8 @@ int SDL_main(int argc, char *argv[]) {
                     }
 
                     my_table.redo();
-                    advance_cursor(&cr1, my_table, s_w);
-                    _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
+                    advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+                    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                     dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                     last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -276,6 +276,11 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
+                my_table.insert_text("\r\n");
+
+                advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+
+                _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                 last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -290,9 +295,9 @@ int SDL_main(int argc, char *argv[]) {
                 }
 
                 if(my_table.delete_text(false))
-                    cr1.x -= s_w;
+                    advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
 
-                _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
+                _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                 last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -307,8 +312,13 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
-                if(my_table.left())
-                    cr1.x -= s_w;
+                if(my_table.left()){
+                    int old_x_offset = x_offset;
+                    advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+                    if(old_x_offset != x_offset)
+                        _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+
+                }
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                 last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -322,8 +332,12 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
-                if(my_table.right())
-                    cr1.x += s_w;
+                if(my_table.right()) {
+                    int old_x_offset = x_offset;
+                    advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+                    if(old_x_offset != x_offset)
+                        _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+                }
 
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
@@ -349,13 +363,15 @@ int SDL_main(int argc, char *argv[]) {
                 my_table.insert_text(t1.substr(_count, UTF8_CHAR_LEN(t1[_count])));
                 _count += UTF8_CHAR_LEN(t1[_count]);
 
-                if((cr1.x += s_w) >= _width) {
-                    cr1.x = 0;
-                    cr1.y += _cur_height;
-                }
+                advance_cursor(&cr1, my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+
+               // if((cr1.x += s_w) >= _width) {
+               //     cr1.x = _width - s_w;
+               //     x_offset -= s_w;
+               // }
             }
 
-            _Render(my_table, _width, _height, s_w, s_h, 0, 0, font_ascent, font_map, screen, font_atlas, key_color);
+            _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
             dest_rect.x = cr1.x; dest_rect.y = cr1.y;
             last_time = SDL_GetTicks64() -_Cursor_Delay;
