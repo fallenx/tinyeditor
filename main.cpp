@@ -1,6 +1,5 @@
 #include <unordered_map>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include "Model.hpp"
 
@@ -100,7 +99,8 @@ void _Render(
 
 void advance_cursor(__cursor *cr1, Model &my_table, int s_w, int _cur_height, int *x_offset, int *y_offset, int _width, int _height) { // to-do indentation
 
-    cr1->x = *x_offset; cr1->y = *y_offset;
+    __cursor t_cr1 = {*x_offset, *y_offset};
+
     if(my_table.piece_map.size()) {
 
         auto it = my_table.piece_map.begin();
@@ -110,16 +110,37 @@ void advance_cursor(__cursor *cr1, Model &my_table, int s_w, int _cur_height, in
             size_t length = (it == my_table.it) ? (it->offset + my_table.Pos) : (it->offset + it->length);
 
             for(size_t Pos = it->offset; Pos < length; Pos += UTF8_CHAR_LEN(my_table.buffer[Pos])) {
+
                 if(!my_table.buffer.substr(Pos, UTF8_CHAR_LEN(my_table.buffer[Pos])).compare("\r\n")){
-                    cr1->y += _cur_height;
-                    cr1->x = *x_offset = 0; // to-do indentation to go back
-                }else if((cr1->x += s_w) > (_width - s_w)) {
-                    cr1->x = _width - s_w;
-                    *x_offset -= s_w;
-                }
+                    t_cr1.y += _cur_height;
+                    t_cr1.x = *x_offset; // to-do indentation to go back
+                }else
+                    t_cr1.x += s_w;
             }
 
         }while(it++ != my_table.it);
+
+        if((cr1->x + (t_cr1.x - cr1->x)) > (_width - s_w)) {
+
+            cr1->x += (t_cr1.x - cr1->x);
+
+            while(cr1->x > (_width - s_w)) {
+                cr1->x -= s_w;
+                *x_offset -= s_w;
+            }
+
+        }else if((cr1->x + (t_cr1.x - cr1->x)) < 0 ) {
+
+            cr1->x += (t_cr1.x - cr1->x);
+
+            while(cr1->x < 0) {
+                cr1->x += s_w;
+                *x_offset += s_w;
+            }
+        }else
+            cr1->x += (t_cr1.x - cr1->x);
+
+        cr1->y = t_cr1.y;
 
     }else
         cr1->x = 0;
@@ -132,7 +153,7 @@ int SDL_main(int argc, char *argv[]) {
     std::unordered_map<std::string, __cursor> font_map;
     bool ctrl_pressed = false;
     int s_w, s_h, font_ascent, _width = 600, _height = 600, x_offset = 0, y_offset = 0;   // 117 15
-    SDL_Surface *font_atlas = prepare_font_atlas(12, &s_w, &s_h, &font_ascent, font_map);
+    SDL_Surface *font_atlas = prepare_font_atlas(14, &s_w, &s_h, &font_ascent, font_map);
     int _cur_height = s_h + font_ascent, _cur_width = s_w;
     _height = (_height / (s_h + font_ascent) + 1) * (s_h + font_ascent);
     _width = (_width / s_w + 1) * s_w;
