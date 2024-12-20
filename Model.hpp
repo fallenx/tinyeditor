@@ -35,7 +35,6 @@ class Model {
     void reinsert(Piece, bool);
     void printbuffer();
     void print_at();
-
 };
 
 #endif // MODEL_HPP
