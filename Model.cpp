@@ -1,10 +1,10 @@
 #include "Model.hpp"
 
-
-Model::Model() : it(piece_map.begin()), Pos(0) {}
-
+inline int Model::UTF8_CHAR_LEN(char byte) {return byte == 0x0d ? 2 : (( 0xE5000000 >> (( byte >> 3 ) & 0x1e )) & 3 ) + 1; }
 inline size_t Model::next() { return buffer[it->offset + Pos] == 0x0d ? 2 : (( 0xE5000000 >> (( buffer[it->offset + Pos] >> 3 ) & 0x1e )) & 3 ) + 1; }
 inline size_t Model::prev() { while(((buffer[it->offset + --Pos] & 0x80) != 0) && ((buffer[it->offset + Pos] & 0xC0) != 0xC0)); return buffer[it->offset + Pos] == 0x0A ? --Pos : Pos; }
+
+Model::Model() : it(piece_map.begin()), page_head(0), Pos(0) {}
 
 void Model::redo() {
 
@@ -137,7 +137,7 @@ bool Model::delete_text(bool from_redo=false) {
 
                 std::pair<size_t, size_t> old_ones (it->offset, it->length);
 
-                if(it != piece_map.end() && (--it)->offset + it->length == old_ones.first) {
+                if(it != piece_map.end() && (--it)->offset + it->length == old_ones.first && buffer.substr(it->offset, UTF8_CHAR_LEN(buffer[it->offset])).compare("\r\n") && buffer.substr(old_ones.first, old_ones.second).compare("\r\n")) {
                     Pos = it->length;
                     it->length += old_ones.second;
                     it = piece_map.erase(++it);
@@ -169,7 +169,7 @@ void Model::insert_text(std::string text) {
     size_t old_size = buffer.size();
     buffer += text;
 
-    if(Pos && it->offset + Pos == old_size) { // Consecutive Modification
+    if(Pos && it->offset + Pos == old_size && buffer.substr(it->offset, UTF8_CHAR_LEN(buffer[it->offset])).compare("\r\n") && text.compare("\r\n")) { // Consecutive Modification
         it->length += text.size();
         undo_list.push_back({INSERT, {it->offset, it->length}});
     }else {
@@ -195,13 +195,13 @@ void Model::insert_text(std::string text) {
 
 void Model::reinsert(Piece piece, bool from_redo) {
 
-    if(Pos && it->offset + Pos == piece.offset) { // Consecutive Modification
+    if(Pos && it->offset + Pos == piece.offset && buffer.substr(it->offset, UTF8_CHAR_LEN(buffer[it->offset])).compare("\r\n") && buffer.substr(piece.offset, piece.length).compare("\r\n")) { // Consecutive Modification
         it->length += next();
         if(from_redo)
             undo_list.push_back({INSERT, {it->offset, it->length}});
         std::pair<size_t, size_t> old_piece(it->offset, it->length);
 
-        if(++it != piece_map.end() && it->offset == old_piece.first + old_piece.second) {
+        if(++it != piece_map.end() && it->offset == old_piece.first + old_piece.second && buffer.substr(it->offset, UTF8_CHAR_LEN(buffer[it->offset])).compare("\r\n") && buffer.substr(old_piece.first, old_piece.second).compare("\r\n")) {
             Pos = old_piece.second;
             it->offset -= Pos;
             it->length += Pos;
@@ -223,7 +223,7 @@ void Model::reinsert(Piece piece, bool from_redo) {
         }else if (Pos)
             ++it;
 
-        if(it != piece_map.end() && piece.offset + piece.length == it->offset){
+        if(it != piece_map.end() && piece.offset + piece.length == it->offset && buffer.substr(it->offset, UTF8_CHAR_LEN(buffer[it->offset])).compare("\r\n") && buffer.substr(piece.offset, piece.length).compare("\r\n")){
             it->length += piece.length;
             it->offset -= piece.length;
             Pos = piece.length;

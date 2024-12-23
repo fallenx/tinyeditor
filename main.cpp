@@ -76,7 +76,7 @@ void _Render(
 
 
 
-    for(auto it = my_table.piece_map.begin(); it != my_table.piece_map.end(); ++it) {
+    for(auto it = my_table.page_head ? my_table.deleted_list[my_table.page_head] : my_table.piece_map.begin(); it != my_table.piece_map.end() && t_y < _height; ++it) {
 
         for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
 
@@ -105,7 +105,7 @@ __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int *x_offset, i
 
     if(my_table.piece_map.size()) {
 
-        auto it = my_table.piece_map.begin();
+        auto it = my_table.page_head ? my_table.deleted_list[my_table.page_head] : my_table.piece_map.begin();
 
         do{
 
@@ -120,7 +120,7 @@ __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int *x_offset, i
                     t_cr1.x += s_w;
             }
 
-        }while(it++ != my_table.it);
+        }while(it++ != my_table.it && t_cr1.y < _height);
     }
 
     return t_cr1;
@@ -329,6 +329,36 @@ int SDL_main(int argc, char *argv[]) {
 
                 cr1.x = to_find.x;
                 cr1.y = to_find.y;
+
+                if(cr1.y > (_height - _cur_height)) {
+                    /// a different approach, go backwords till first line
+
+                    auto t = my_table.it;
+
+                    if(t != my_table.piece_map.begin()) {
+
+                        do {
+
+
+
+                        }while(t--!= my_table.piece_map.begin());
+                    }
+
+
+                    ///forward search for the next new line
+                    for(auto t = my_table.page_head ? my_table.deleted_list[my_table.page_head] : my_table.piece_map.begin(); t != my_table.piece_map.end(); ++t) {
+
+                        if(!my_table.buffer.substr(t->offset, 2).compare("\r\n")) {
+                            auto it = my_table.deleted_list[t->offset];
+                            if(++it != my_table.piece_map.end())
+                                my_table.page_head = it->offset;
+                            break;
+                        }
+
+                    }
+
+                    cr1.y = _height - _cur_height;
+                }
 
                 _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
@@ -596,7 +626,6 @@ int SDL_main(int argc, char *argv[]) {
 
             cr1.x = to_find.x;
             cr1.y = to_find.y;
-
 
             _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
