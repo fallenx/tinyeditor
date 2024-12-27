@@ -74,15 +74,16 @@ void _Render(
 
     int t_x = x_offset, t_y = y_offset;
 
+    auto page_head = my_table.page_head ? my_table.deleted_list[my_table.page_head] : my_table.piece_map.begin();
 
 
-    for(auto it = my_table.piece_map.begin(); it != my_table.piece_map.end(); ++it) {
+    for(auto it = page_head; it != my_table.piece_map.end() && t_y < _height; ++it) {
 
         for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
 
             std::string tt_me = my_table.buffer.substr(it->offset + Pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos]));
 
-            if(font_map.find(tt_me) != font_map.end() && t_x >= 0 && t_x < _width){
+            if(font_map.find(tt_me) != font_map.end() && t_x >= 0 && t_x < _width && t_y >= 0){
                 SDL_Rect temp_font = {(int) font_map[tt_me].x, 0, s_w, s_h};
                 SDL_Rect temp_rect = {t_x, t_y + font_ascent, s_w, s_h};
                 SDL_BlitSurface(font_atlas, &temp_font, screen, &temp_rect);
@@ -105,7 +106,7 @@ __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int *x_offset, i
 
     if(my_table.piece_map.size()) {
 
-        auto it = my_table.piece_map.begin();
+        auto it = my_table.page_head ? my_table.deleted_list[my_table.page_head] : my_table.piece_map.begin();
 
         do{
 
@@ -120,11 +121,64 @@ __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int *x_offset, i
                     t_cr1.x += s_w;
             }
 
-        }while(it++ != my_table.it);
+        }while(it++ != my_table.it && t_cr1.y <= _height + _cur_height);
     }
 
     return t_cr1;
 }
+
+int page_upwards(Model &my_table, int _cur_height, int *y_offset) {
+
+    int t_cur = 0;
+
+    if(my_table.page_head) {
+
+        auto t = my_table.deleted_list[my_table.page_head];
+
+        while(--t != my_table.piece_map.begin()) {
+
+            if(!my_table.buffer.substr(t->offset, 2).compare("\r\n")) {
+                my_table.page_head = t->offset;
+                break;
+            }
+        }
+
+        if(t == my_table.piece_map.begin()) {
+            my_table.page_head = 0;
+            if(my_table.buffer.substr(t->offset, 2).compare("\r\n"))
+                *y_offset = 0;
+        }
+
+        t_cur = _cur_height;
+    }else if(*y_offset)
+        *y_offset = 0;
+
+    return t_cur;
+}
+
+void page_downwards(Model &my_table, int _cur_height, int *y_offset) {
+
+    auto t = my_table.page_head ? my_table.deleted_list[my_table.page_head] : my_table.piece_map.begin();
+
+    if(t == my_table.piece_map.begin() && !my_table.buffer.substr(t->offset, 2).compare("\r\n") && !*y_offset) {
+            *y_offset = -_cur_height;
+    }else {
+
+        while(++t != my_table.piece_map.end()) {
+
+            if(!my_table.buffer.substr(t->offset, 2).compare("\r\n")) {
+                my_table.page_head = t->offset;
+                break;
+            }
+
+        }
+    }
+
+    if(!*y_offset)
+        *y_offset = -_cur_height;
+}
+
+
 
 int SDL_main(int argc, char *argv[]) {
 
@@ -243,6 +297,7 @@ int SDL_main(int argc, char *argv[]) {
 
                     my_table.undo();
 
+
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
 
                     if(to_find.x > (_width - s_w)) {
@@ -330,8 +385,14 @@ int SDL_main(int argc, char *argv[]) {
                 cr1.x = to_find.x;
                 cr1.y = to_find.y;
 
-                _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+                if(cr1.y > (_height - _cur_height)) {
 
+                    page_downwards(my_table, _cur_height, &y_offset);
+
+                    cr1.y = _height - _cur_height;
+                }
+
+                _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                 last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -344,6 +405,11 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_Rect temp_rect = {dest_rect.x, dest_rect.y, _cur_width, _cur_height};
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
+
+
+                if(!cr1.y && !cr1.x)
+                    cr1.y = page_upwards(my_table, _cur_height, &y_offset);
+
 
                 if(my_table.delete_text(false)) {
 
@@ -382,8 +448,11 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
+                if(!cr1.y && !cr1.x)
+                    cr1.y = page_upwards(my_table, _cur_height, &y_offset);
+
+
                 if(my_table.left()){
-                    int old_x_offset = x_offset;
 
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
 
@@ -402,8 +471,7 @@ int SDL_main(int argc, char *argv[]) {
                     cr1.x = to_find.x;
                     cr1.y = to_find.y;
 
-                    if(old_x_offset != x_offset)
-                        _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+                    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 }
 
@@ -420,7 +488,6 @@ int SDL_main(int argc, char *argv[]) {
                 }
 
                 if(my_table.right()) {
-                    int old_x_offset = x_offset;
 
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
 
@@ -439,8 +506,15 @@ int SDL_main(int argc, char *argv[]) {
                     cr1.x = to_find.x;
                     cr1.y = to_find.y;
 
-                    if(old_x_offset != x_offset)
-                        _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+                    if(cr1.y > (_height - _cur_height)) {
+
+                        page_downwards(my_table, _cur_height, &y_offset);
+
+                        cr1.y = _height - _cur_height;
+                    }
+
+
+                    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 }
 
@@ -457,8 +531,8 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
-                int old_x_offset = x_offset;
                 __cursor to_find = {cr1.x, cr1.y};
+
 
                 while(my_table.right()) {
 
@@ -507,9 +581,16 @@ int SDL_main(int argc, char *argv[]) {
                 cr1.x = to_find.x;
                 cr1.y = to_find.y;
 
+                if(cr1.y > (_height - _cur_height)) {
 
-                if(old_x_offset != x_offset)
-                    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+                    page_downwards(my_table, _cur_height, &y_offset);
+
+                    cr1.y = _height - _cur_height;
+                }
+
+
+
+                _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                 last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -525,12 +606,19 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
-                int old_x_offset = x_offset;
                 __cursor to_find = {};
+
+
+                if(!cr1.y)
+                    cr1.y = page_upwards(my_table, _cur_height, &y_offset);
+
 
                 while(my_table.left()) {
 
                     to_find = find_cursor(my_table, s_w, _cur_height, &x_offset, &y_offset, _width, _height);
+
+                    ///go back
+
 
                     if(to_find.y < cr1.y && to_find.x <= cr1.x)
                         break;
@@ -552,8 +640,11 @@ int SDL_main(int argc, char *argv[]) {
                 cr1.y = to_find.y;
 
 
-                if(old_x_offset != x_offset)
-                    _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
+                if(cr1.y < 0)
+                    cr1.y = 0;
+
+
+                _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
                 dest_rect.x = cr1.x; dest_rect.y = cr1.y;
                 last_time = SDL_GetTicks64() - _Cursor_Delay;
@@ -596,7 +687,6 @@ int SDL_main(int argc, char *argv[]) {
 
             cr1.x = to_find.x;
             cr1.y = to_find.y;
-
 
             _Render(my_table, _width, _height, s_w, s_h, x_offset, y_offset, font_ascent, font_map, screen, font_atlas, key_color);
 
