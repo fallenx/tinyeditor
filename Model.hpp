@@ -19,12 +19,14 @@ class Model {
     std::vector<Redo_Piece> redo_list;
     std::vector<Undo_Piece> undo_list;
     std::list<Piece>::iterator it;
+    size_t page_head;
     std::string buffer;
     size_t Pos;
 
     Model();
     inline size_t next();
     inline size_t prev();
+    inline int UTF8_CHAR_LEN(char);
 
     void undo();
     void redo();
