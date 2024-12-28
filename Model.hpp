@@ -25,6 +25,7 @@ class Model {
     Model();
     inline size_t next();
     inline size_t prev();
+    inline int UTF8_CHAR_LEN(char);
 
     void undo();
     void redo();
