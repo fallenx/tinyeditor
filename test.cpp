@@ -6,7 +6,7 @@ inline int UTF8_CHAR_LEN(char byte) {return byte == 0x0d ? 2 : (( 0xE5000000 >> 
 
 int main(int argc, char *argv[]) {
 
-    std::string my_string = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_\r\n`abcdefghijklmnopqrstuvwxyz{|}~";
+    std::string my_string = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
     my_string += "ÇĞİÖŞÜçğıöşü"; /// Turkish
 
     std::map<size_t, std::string> my_map;
@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     //    std::cout << i.second << " ";
 
 
-    enum {INSERT, LEFT, RIGHT, DELETE, UNDO, REDO};
+    enum {INSERT, LEFT, RIGHT, DELETE, UNDO, REDO, NEWLINE};
 
 
     srand(time(NULL));
@@ -36,7 +36,21 @@ int main(int argc, char *argv[]) {
             //if(!(test_count % 1000))
             //    std::cout << "Table Size " << my_model.piece_map.size() << "\n";
 
-            switch(rand() % 6) {
+            switch(rand() % 7) {
+
+                case NEWLINE:
+                    {
+
+                        for(int i= 0; i < rand() % 10 + 1;i++) {
+                            //std::cout << "NewLine\n";
+                            my_model.insert_text("\r\n");
+                            //my_model.print_at();
+                            //my_model.printbuffer();
+                        }
+
+                    }
+
+                    break;
 
                 case INSERT:
                     {
@@ -45,7 +59,7 @@ int main(int argc, char *argv[]) {
                         for(int i= 0; i < rand() % 10 + 1;i++) {
                             //std::cout << "Insert\n";
                             std::string to_insert;
-                            to_insert = my_map[rand() % my_map.size()];
+                            to_insert = my_map[rand() % 25 + 67];//my_map.size()];
                             my_model.insert_text(to_insert);
                             //my_model.print_at();
                             //my_model.printbuffer();
