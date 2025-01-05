@@ -12,6 +12,7 @@ Model::Model() : it(piece_map.begin()) {
 
     Pos = it->length;
     head = piece_map.begin();
+    batch_start = {it, Pos};
 }
 
 void Model::redo() {

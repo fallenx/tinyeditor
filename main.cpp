@@ -73,6 +73,9 @@ void _Render(
 
     int t_x = x_offset, t_y = y_offset;
 
+    SDL_Surface *Cursor = SDL_CreateRGBSurface(0, s_w , _cur_height, 32, 0xff, 0xff00, 0xff0000, 0xff000000);
+    SDL_FillRect(Cursor, NULL, SDL_MapRGBA(Cursor->format, 29, 242, 10, 180));
+
     for(auto it = my_table.head; it != my_table.piece_map.end() && _height; ++it) {
 
         for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
@@ -82,6 +85,7 @@ void _Render(
             if(font_map.find(tt_me) != font_map.end() && t_x >= 0 && t_x < _width && t_y >= 0){
                 SDL_Rect temp_font = {(int) font_map[tt_me].x, 0, s_w, _cur_height};
                 SDL_Rect temp_rect = {t_x, t_y, s_w, _cur_height};
+                SDL_BlitSurface(Cursor, NULL, screen, &temp_rect);
                 SDL_BlitSurface(font_atlas, &temp_font, screen, &temp_rect);
             }
 
@@ -94,6 +98,7 @@ void _Render(
 
     }
 
+    SDL_FreeSurface(Cursor);
 }
 
 __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int x_offset, int y_offset, int _width, int _height) {
@@ -249,14 +254,12 @@ int resizingEventWatcher(void* data, SDL_Event* event) {
     return 0;
 }
 
-
-
 int SDL_main(int argc, char *argv[]) {
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
     TTF_Init();
     std::unordered_map<std::string, __cursor> font_map;
-    bool ctrl_pressed = false;
+    bool ctrl_pressed = false, shift_pressed = false;
     int s_w, s_h, font_ascent, _width = 600, _height = 600, x_offset = 0;  // 117 15
     SDL_Surface *font_atlas = prepare_font_atlas(14, &s_w, &s_h, &font_ascent, font_map);
     int _cur_height = s_h + font_ascent, _cur_width = 1;
@@ -354,6 +357,11 @@ int SDL_main(int argc, char *argv[]) {
             if(e.key.keysym.sym == SDLK_LCTRL || e.key.keysym.sym == SDLK_RCTRL)
                 ctrl_pressed = false;
 
+            if(e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_RSHIFT) {
+                shift_pressed = false;
+                my_table.batch_start = {my_table.it, my_table.Pos};
+            }
+
         }
 
 
@@ -362,6 +370,13 @@ int SDL_main(int argc, char *argv[]) {
             if(e.key.keysym.sym == SDLK_LCTRL || e.key.keysym.sym == SDLK_RCTRL) {
                 if(!ctrl_pressed)
                     ctrl_pressed = true;
+            }
+
+            if(e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_RSHIFT) {
+                if(!shift_pressed) {
+                    shift_pressed = true;
+                    my_table.batch_start = {my_table.it, my_table.Pos};
+                }
             }
 
 
@@ -483,13 +498,24 @@ int SDL_main(int argc, char *argv[]) {
                 }
 
 
-                if(!cr1.y && !cr1.x && !x_offset)
-                    cr1.y = page_upwards(my_table, _cur_height);
-
-
                 if(my_table.delete_text(false)) {
 
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
+
+                    if(to_find.y > (t_height - _cur_height)) {
+
+                       find_page_head(my_table, _cur_height);
+
+                       to_find.y = -_cur_height;
+
+                       while(to_find.y < _height>>1 && my_table.head != my_table.piece_map.begin()) {
+                            to_find.y = page_upwards(my_table, _cur_height);
+                            to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
+                       }
+
+                       to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
+
+                    }
 
                     find_x(&to_find, &x_offset, _width, s_w);
 
@@ -514,13 +540,25 @@ int SDL_main(int argc, char *argv[]) {
                     SDL_BlitSurface(Temp_Surface, NULL, screen, &temp_rect);
                 }
 
-                if(!cr1.y && !cr1.x && !x_offset)
-                    cr1.y = page_upwards(my_table, _cur_height);
-
 
                 if(my_table.left()){
 
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
+
+                    if(to_find.y > (t_height - _cur_height)) {
+
+                       find_page_head(my_table, _cur_height);
+
+                       to_find.y = -_cur_height;
+
+                       while(to_find.y < _height>>1 && my_table.head != my_table.piece_map.begin()) {
+                            to_find.y = page_upwards(my_table, _cur_height);
+                            to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
+                       }
+
+                       to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
+
+                    }
 
                     find_x(&to_find, &x_offset, _width, s_w);
 
@@ -544,6 +582,7 @@ int SDL_main(int argc, char *argv[]) {
                 }
 
                 if(my_table.right()) {
+
 
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
 
@@ -734,8 +773,8 @@ int SDL_main(int argc, char *argv[]) {
                     //_height = (_height / (s_h + font_ascent)) * _cur_height;
                     //_width = (_width / s_w ) * s_w;
 
-                    if(_height < 2 * _cur_height)
-                        _height = 2 * _cur_height;
+                    if(_height < 4 * _cur_height)
+                        _height = 4 * _cur_height;
 
                     if(_width < 40 * s_w)
                         _width = 40 * s_w;

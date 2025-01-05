@@ -10,7 +10,7 @@
 class Model {
 
     public:
-    enum {INSERT, DELETE};
+    enum {INSERT, DELETE, BATCH_INSERT, BATCH_DELETE};
     struct Piece {size_t offset; size_t length;};
     struct Undo_Piece {size_t type; Piece piece;};
     struct Redo_Piece {size_t type; size_t Pos; size_t offset; Piece piece;};
@@ -20,6 +20,7 @@ class Model {
     std::vector<Undo_Piece> undo_list;
     std::list<Piece>::iterator it;
     std::list<Piece>::iterator head;
+    std::pair<std::list<Piece>::iterator, size_t> batch_start;
     std::string buffer;
     size_t Pos;
 
