@@ -73,10 +73,7 @@ void _Render(
 
     int t_x = x_offset, t_y = y_offset;
 
-    SDL_Surface *Cursor = SDL_CreateRGBSurface(0, s_w , _cur_height, 32, 0xff, 0xff00, 0xff0000, 0xff000000);
-    SDL_FillRect(Cursor, NULL, SDL_MapRGBA(Cursor->format, 29, 242, 10, 180));
-
-    for(auto it = my_table.head; it != my_table.piece_map.end() && _height; ++it) {
+    for(auto it = my_table.head; it != my_table.piece_map.end() && t_y < _height + _cur_height; ++it) {
 
         for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
 
@@ -85,7 +82,6 @@ void _Render(
             if(font_map.find(tt_me) != font_map.end() && t_x >= 0 && t_x < _width && t_y >= 0){
                 SDL_Rect temp_font = {(int) font_map[tt_me].x, 0, s_w, _cur_height};
                 SDL_Rect temp_rect = {t_x, t_y, s_w, _cur_height};
-                SDL_BlitSurface(Cursor, NULL, screen, &temp_rect);
                 SDL_BlitSurface(font_atlas, &temp_font, screen, &temp_rect);
             }
 
@@ -98,7 +94,83 @@ void _Render(
 
     }
 
-    SDL_FreeSurface(Cursor);
+}
+
+void Batch_Renderer(
+                Model &my_table,
+                int _width,
+                int _height,
+                int s_w,
+                int _cur_height,
+                int x_offset,
+                int y_offset,
+                SDL_Surface *screen,
+                Uint32 key_color
+                ) {
+
+        if(my_table.batch_start.first != my_table.batch_end.first || (my_table.batch_start.first == my_table.batch_end.first && my_table.batch_start.second != my_table.batch_end.second)) {
+
+            SDL_Surface *Cursor = SDL_CreateRGBSurface(0, s_w , _cur_height, 32, 0xff, 0xff00, 0xff0000, 0xff000000);
+            SDL_FillRect(Cursor, NULL, key_color);
+
+            int t_x = x_offset, t_y = y_offset;
+            bool render_batch = true;
+
+            for(auto it = my_table.head; it != my_table.piece_map.end() && t_y < _height + _cur_height; ++it) {
+
+                for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
+
+                    if(it == my_table.batch_start.first && Pos == my_table.batch_start.second)
+                        render_batch = false;
+
+                    if(!my_table.buffer.substr(it->offset + Pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])).compare("\r\n")){
+                        t_y += _cur_height;
+                        t_x = x_offset;
+                    }else
+                        t_x += s_w;
+                }
+
+                if(it == my_table.batch_start.first && it->length == my_table.batch_start.second)
+                    render_batch = false;
+
+            }
+
+            t_x = x_offset; t_y = y_offset;
+
+            for(auto it = my_table.head; it != my_table.piece_map.end() && t_y < _height + _cur_height; ++it) {
+
+                for(size_t Pos = 0; Pos < it->length; Pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])) {
+
+                    if(it == my_table.batch_start.first && Pos == my_table.batch_start.second)
+                        render_batch = true;
+                    else if(it == my_table.batch_end.first && Pos == my_table.batch_end.second)
+                        render_batch = false;
+
+
+                    if(render_batch && t_x >= 0 && t_x < _width && t_y >= 0) {
+                        SDL_Rect temp_rect = {t_x, t_y, s_w, _cur_height};
+                        SDL_BlitSurface(Cursor, NULL, screen, &temp_rect);
+                    }
+
+                    if(!my_table.buffer.substr(it->offset + Pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + Pos])).compare("\r\n")){
+                        t_y += _cur_height;
+                        t_x = x_offset;
+                    }else
+                        t_x += s_w;
+                }
+
+                if(it == my_table.batch_start.first && it->length == my_table.batch_start.second)
+                    render_batch = true;
+                else if(it == my_table.batch_end.first && it->length == my_table.batch_end.second)
+                    render_batch = false;
+
+
+            }
+
+            SDL_FreeSurface(Cursor);
+
+        }
+
 }
 
 __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int x_offset, int y_offset, int _width, int _height) {
@@ -115,6 +187,7 @@ __cursor find_cursor(Model &my_table, int s_w, int _cur_height, int x_offset, in
                 t_cr1.y = _height + _cur_height;
                 break;
             }
+
             size_t length = (it == my_table.it) ? (it->offset + my_table.Pos) : (it->offset + it->length);
 
             for(size_t Pos = it->offset; Pos < length; Pos += UTF8_CHAR_LEN(my_table.buffer[Pos])) {
@@ -358,8 +431,9 @@ int SDL_main(int argc, char *argv[]) {
                 ctrl_pressed = false;
 
             if(e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_RSHIFT) {
-                shift_pressed = false;
                 my_table.batch_start = {my_table.it, my_table.Pos};
+                my_table.batch_end = {my_table.it, my_table.Pos};
+                shift_pressed = false;
             }
 
         }
@@ -374,8 +448,9 @@ int SDL_main(int argc, char *argv[]) {
 
             if(e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_RSHIFT) {
                 if(!shift_pressed) {
-                    shift_pressed = true;
                     my_table.batch_start = {my_table.it, my_table.Pos};
+                    shift_pressed = true;
+                    std::cout << "shift pressed\n";
                 }
             }
 
@@ -583,6 +658,9 @@ int SDL_main(int argc, char *argv[]) {
 
                 if(my_table.right()) {
 
+                    if(shift_pressed) {
+                        my_table.batch_end = {my_table.it, my_table.Pos};
+                    }
 
                     __cursor to_find = find_cursor(my_table, s_w, _cur_height, x_offset, y_offset, _width, _height);
 
@@ -600,6 +678,7 @@ int SDL_main(int argc, char *argv[]) {
 
 
                     _Render(my_table, _width, _height, s_w, _cur_height, x_offset, y_offset, font_map, screen, font_atlas, key_color);
+                    Batch_Renderer(my_table, _width, _height, s_w, _cur_height, x_offset, y_offset, screen, SDL_MapRGBA(Cursor->format, 29, 242, 10, 180));
 
                 }
 
