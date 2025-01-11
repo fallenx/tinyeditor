@@ -21,6 +21,7 @@ class Model {
     std::list<Piece>::iterator it;
     std::list<Piece>::iterator head;
     std::pair<std::list<Piece>::iterator, size_t> batch_start;
+    std::pair<std::list<Piece>::iterator, size_t> batch_end;
     std::string buffer;
     size_t Pos;
 

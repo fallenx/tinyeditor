@@ -13,6 +13,7 @@ Model::Model() : it(piece_map.begin()) {
     Pos = it->length;
     head = piece_map.begin();
     batch_start = {it, Pos};
+    batch_end = {it, Pos};
 }
 
 void Model::redo() {
@@ -84,10 +85,8 @@ void Model::undo() {
 bool Model::left() {
 
     if(it != piece_map.begin()) {
-        if(!prev()) {
-            //if(it != piece_map.begin())
+        if(!prev())
             Pos = (--it)->length;
-        }
         return true;
     }
     return false;
