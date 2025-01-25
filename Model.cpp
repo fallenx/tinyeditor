@@ -1,6 +1,5 @@
 #include "Model.hpp"
 
-inline int Model::UTF8_CHAR_LEN(char byte) {return byte == 0x0d ? 2 : (( 0xE5000000 >> (( byte >> 3 ) & 0x1e )) & 3 ) + 1; }
 inline size_t Model::next() { return buffer[it->offset + Pos] == 0x0d ? 2 : (( 0xE5000000 >> (( buffer[it->offset + Pos] >> 3 ) & 0x1e )) & 3 ) + 1; }
 inline size_t Model::prev() { while(((buffer[it->offset + --Pos] & 0x80) != 0) && ((buffer[it->offset + Pos] & 0xC0) != 0xC0)); return buffer[it->offset + Pos] == 0x0A ? --Pos : Pos; }
 
@@ -12,6 +11,7 @@ Model::Model() : it(piece_map.begin()) {
 
     Pos = it->length;
     head = piece_map.begin();
+    line_map[0] = 0;
     batch_start = {it, Pos};
     batch_end = {it, Pos};
 }
