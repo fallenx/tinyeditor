@@ -1,4 +1,4 @@
 # Just model
-Simply implementing the double-linked list piece table model
+Simply implementing the doubly linked list piece table model
 
 
