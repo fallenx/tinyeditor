@@ -20,6 +20,7 @@ class Buffer {
     int s_w, s_h, font_ascent, _width, _height, x_offset, y_offset, _cur_height, t_height, line_offset, count_spaces, line_map_size;
     int _cur_width;
     int current_head_line;
+    int max_line;
     bool ctrl_pressed, shift_pressed, shift_was_pressed;
     SDL_Surface *screen;
     SDL_Surface *font_atlas;
@@ -47,7 +48,7 @@ class Buffer {
     void update_line_numbers();
     void shift_control();
     void insert_line(int, int);
-    void delete_line(int, int);
+    void remove_line(int, int);
     int find_head_line(int);
 
 public:

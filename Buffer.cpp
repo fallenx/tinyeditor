@@ -20,6 +20,7 @@ Buffer::Buffer(const char* BufferName, int _width, int _height) {
     cr1.y = 0;
     count_spaces = 0;
     current_head_line = 0;
+    max_line = 0;
 
     x_offset = 0;
     y_offset = -_cur_height;
@@ -101,11 +102,9 @@ int Buffer::find_head_line(int offset) {
     return -1;
 }
 
-void Buffer::insert_line(int len, int offset) {
+void Buffer::remove_line(int len, int offset) {
 
     int line_count = current_head_line;
-
-    //auto it = my_table.head;
 
 
     for(auto it = my_table.head; it != my_table.it; ++it) {
@@ -113,32 +112,52 @@ void Buffer::insert_line(int len, int offset) {
             line_count++;
     }
 
-    std::cout << "line count " << line_count << "\n";
+    memmove(line_map + line_count, line_map + line_count + len, sizeof(int) * max_line);
 
-    ///check if last_line is still inbound
+    max_line--;
 
-    int c_len = line_map_size;
+    for(int i = 0; i < 10; i++)
+        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+    std::cout << "Max Line " << max_line << "\n";
+
+
+
+}
+
+void Buffer::insert_line(int len, int offset) {
+
+    int line_count = current_head_line;
+
+
+    for(auto it = my_table.head; it != my_table.it; ++it) {
+        if(!my_table.buffer.substr(it->offset, UTF8_CHAR_LEN(my_table.buffer[it->offset])).compare("\r\n"))
+            line_count++;
+    }
+
+
     bool needs_update = false;
 
-    for(int i = 0; i < len; i++) {
-        if(line_map[--c_len]) {
-            needs_update = true;
-            break;
-        }
-    }
+    if(++max_line == line_map_size)
+        needs_update = true;
+
+
 
     if(needs_update) {
         std::cout << "needs update\n";
     }
 
-    memmove(line_map + line_count + len, line_map + line_count, sizeof(int) * (line_map_size - (line_count + len)));
+
+    memmove(line_map + line_count + len, line_map + line_count, sizeof(int) * max_line);
+
 
     line_map[line_count] = offset;
 
     for(int i = 0; i < 10; i++)
         std::cout << "line " << i << " offset " << line_map[i] << "\n";
 
-    std::cout << "\n";
+    std::cout << "Max Line " << max_line << "\n";
+
 
 }
 
@@ -233,10 +252,11 @@ void Buffer::Render() {
 
     //SDL_FillRect(screen, &line_rect, SDL_MapRGBA(screen->format, 30, 32, 36, 255));
 
-    std::cout << "Offset = " << my_table.head->offset << " Head Line " << find_head_line((int) my_table.head->offset) << "\n";
+    //std::cout << "Offset = " << my_table.head->offset << " Head Line " << find_head_line((int) my_table.head->offset) << "\n";
 
 
-    size_t _line_count = my_table.line_map[my_table.head->offset];
+    //size_t _line_count = my_table.line_map[my_table.head->offset];
+    size_t _line_count = find_head_line((int) my_table.head->offset);
 
     std::string _linec = std::to_string(_line_count);
 
@@ -298,7 +318,7 @@ void Buffer::Render() {
                 t_y += _cur_height;
                 t_x = line_offset + x_offset;
 
-                my_table.line_map[it->offset] = _line_count;
+                //my_table.line_map[it->offset] = _line_count;
                 _linec = std::to_string(++_line_count);
 
                 for(size_t i = 0; i < _linec.size(); i++) {
@@ -705,8 +725,12 @@ void Buffer::Back_Space() {
 
         shift_control();
 
-        if(!cr1.y && !x_offset &&  cr1.x == line_offset)
+        if(!cr1.y && !x_offset && cr1.x == line_offset)
             cr1.y = page_upwards();
+
+        if(my_table.it != my_table.piece_map.begin())
+            if(!my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n"))
+                remove_line(1,0);
 
         if(my_table.delete_text(false)) {
 
