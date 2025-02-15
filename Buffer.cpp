@@ -21,6 +21,7 @@ Buffer::Buffer(const char* BufferName, int _width, int _height) {
     count_spaces = 0;
     current_head_line = 0;
     max_line = 0;
+    copy_line_len = 0;
 
     x_offset = 0;
     y_offset = -_cur_height;
@@ -33,7 +34,8 @@ Buffer::Buffer(const char* BufferName, int _width, int _height) {
     line_map_size = 10000;
 
     line_map = (int*) malloc(line_map_size * sizeof(int));
-    memset(line_map, 0, line_map_size * sizeof(int));
+    memset(line_map, -1, line_map_size * sizeof(int));
+    line_map[0] = 0;
 
 
     Cursor = SDL_CreateRGBSurface(0, _cur_width , _cur_height, 32, 0xff, 0xff00, 0xff0000, 0xff000000);
@@ -74,6 +76,29 @@ void Buffer::set_shift(bool pressed) {
         }
 }
 
+int Buffer::find_line(int offset) {
+
+    int left = current_head_line;
+    int right = current_head_line;
+
+    if(line_map[current_head_line] == offset)
+        return current_head_line;
+
+    while(left || right < line_map_size) {
+
+        if(left > 0)
+            if(line_map[--left] == offset)
+                return left;
+
+        if(right < line_map_size)
+            if(line_map[++right] == offset)
+                return right;
+
+    }
+
+    return -1;
+}
+
 
 int Buffer::find_head_line(int offset) {
 
@@ -98,9 +123,9 @@ int Buffer::find_head_line(int offset) {
             }
     }
 
-
     return -1;
 }
+
 
 void Buffer::remove_line(int len, int offset) {
 
@@ -121,8 +146,6 @@ void Buffer::remove_line(int len, int offset) {
 
     std::cout << "Max Line " << max_line << "\n";
 
-
-
 }
 
 void Buffer::insert_line(int len, int offset) {
@@ -140,8 +163,6 @@ void Buffer::insert_line(int len, int offset) {
 
     if(++max_line == line_map_size)
         needs_update = true;
-
-
 
     if(needs_update) {
         std::cout << "needs update\n";
@@ -254,6 +275,7 @@ void Buffer::Render() {
 
     //std::cout << "Offset = " << my_table.head->offset << " Head Line " << find_head_line((int) my_table.head->offset) << "\n";
 
+    //std::cout << "Head offset " << my_table.head->offset << "\n";
 
     //size_t _line_count = my_table.line_map[my_table.head->offset];
     size_t _line_count = find_head_line((int) my_table.head->offset);
@@ -513,6 +535,17 @@ bool Buffer::batch_delete(bool is_cut) {
         my_table.it = my_table.batch_end.first;
         my_table.Pos = my_table.batch_end.second;
 
+        auto it_start = my_table.batch_start.first;
+
+        while(it_start != my_table.piece_map.end()){
+            if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+                break;
+            it_start++;
+        }
+
+        int start_line = find_line(it_start->offset) + 1;
+        int c_lines = 0;
+
         auto it = my_table.batch_start.first;
         size_t batch_length = 0;
 
@@ -520,11 +553,23 @@ bool Buffer::batch_delete(bool is_cut) {
             size_t length = (it == my_table.batch_end.first) ? my_table.batch_end.second : it->length;
             size_t s_pos = (it == my_table.batch_start.first) ? my_table.batch_start.second : 0;
             for(size_t t_pos = s_pos; t_pos < length; t_pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos])) {
+                if(!my_table.buffer.substr(it->offset, 2).compare("\r\n"))
+                    c_lines++;
                 batch_length++;
                 if(is_cut)
                     my_table.batch_buffer += my_table.buffer.substr(it->offset + t_pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos]));
             }
         }while(it++ != my_table.batch_end.first);
+
+        if(c_lines) {
+            memmove(line_map + start_line, line_map + start_line + c_lines, sizeof(int) * max_line);
+            max_line -= c_lines;
+        }
+
+        for(int i = 0; i < 100; i++)
+            std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+        std::cout << "Max Line " << max_line << "\n";
 
         while(batch_length--)
             my_table.delete_text(false);
@@ -552,12 +597,9 @@ void Buffer::Undo() {
 
     shift_control();
 
-    if(my_table.undo_list.size())
-        if(!my_table.buffer.substr(my_table.undo_list.back().piece.offset, 2).compare("\r\n"))
-            std::cout << "hmm\n";
-
     my_table.undo();
     find_page();
+
 
     dest_rect.x = cr1.x; dest_rect.y = cr1.y;
     blink_on = true;
@@ -601,6 +643,7 @@ void Buffer::Copy() {
     }
 
     my_table.batch_buffer.clear();
+    copy_line_len = 0;
 
     if(my_table.batch_start.first != my_table.batch_end.first || (my_table.batch_start.first == my_table.batch_end.first && my_table.batch_start.second != my_table.batch_end.second)) {
 
@@ -609,8 +652,11 @@ void Buffer::Copy() {
         do {
             size_t length = (it == my_table.batch_end.first) ? my_table.batch_end.second : it->length;
             size_t s_pos = (it == my_table.batch_start.first) ? my_table.batch_start.second : 0;
-            for(size_t t_pos = s_pos; t_pos < length; t_pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos]))
+            for(size_t t_pos = s_pos; t_pos < length; t_pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos])) {
                 my_table.batch_buffer += my_table.buffer.substr(it->offset + t_pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos]));
+                if(!my_table.buffer.substr(it->offset, 2).compare("\r\n"))
+                    copy_line_len++;
+            }
 
         }while(it++ != my_table.batch_end.first);
 
@@ -638,12 +684,37 @@ void Buffer::Paste() {
 
     if(!my_table.batch_buffer.empty()) {
 
+        auto it_start = my_table.it;
 
-        for(size_t pos = 0; pos < my_table.batch_buffer.size(); pos += UTF8_CHAR_LEN(my_table.batch_buffer[pos]))
+        while(it_start != my_table.piece_map.end()){
+            if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+                break;
+            it_start++;
+        }
+
+        int start_line = find_line(it_start->offset) + 1;
+
+        max_line += copy_line_len;
+
+        memmove(line_map + start_line + copy_line_len, line_map + start_line, sizeof(int) * max_line);
+
+        int line_count = start_line;
+
+
+        for(size_t pos = 0; pos < my_table.batch_buffer.size(); pos += UTF8_CHAR_LEN(my_table.batch_buffer[pos])) {
             my_table.insert_text(my_table.batch_buffer.substr(pos, UTF8_CHAR_LEN(my_table.batch_buffer[pos])));
+            if(!my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n"))
+                 line_map[line_count++] = my_table.it->offset;
+
+        }
 
 
-        update_line_numbers();
+        for(int i = 0; i < 10; i++)
+            std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+        std::cout << "Max Line " << max_line << "\n";
+
+        //update_line_numbers();
         find_page();
 
     }

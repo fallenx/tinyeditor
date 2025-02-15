@@ -21,6 +21,7 @@ class Buffer {
     int _cur_width;
     int current_head_line;
     int max_line;
+    int copy_line_len;
     bool ctrl_pressed, shift_pressed, shift_was_pressed;
     SDL_Surface *screen;
     SDL_Surface *font_atlas;
@@ -50,6 +51,7 @@ class Buffer {
     void insert_line(int, int);
     void remove_line(int, int);
     int find_head_line(int);
+    int find_line(int);
 
 public:
 
