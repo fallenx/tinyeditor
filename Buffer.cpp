@@ -597,6 +597,27 @@ void Buffer::Undo() {
 
     shift_control();
 
+    if(my_table.undo_list.size()) {
+            if(!my_table.buffer.substr(my_table.undo_list.back().piece.offset, 2).compare("\r\n")) {
+                if(my_table.undo_list.back().type == my_table.INSERT) {
+
+                    std::cout << "The line is " <<find_line(my_table.undo_list.back().piece.offset) << "\n";
+
+                    int start_line = find_line(my_table.undo_list.back().piece.offset);
+
+                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * max_line);
+                    max_line--;
+
+                    for(int i = 0; i < 10; i++)
+                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+                    std::cout << "Max Line " << max_line << "\n";
+
+                }
+            }
+
+    }
+
     my_table.undo();
     find_page();
 
