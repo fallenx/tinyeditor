@@ -31,7 +31,7 @@ Buffer::Buffer(const char* BufferName, int _width, int _height) {
     blink_on = true;
     dest_rect = {cr1.x, cr1.y, _cur_width, _cur_height};
 
-    line_map_size = 10000;
+    line_map_size = 1000000;
 
     line_map = (int*) malloc(line_map_size * sizeof(int));
     memset(line_map, -1, line_map_size * sizeof(int));
@@ -84,13 +84,13 @@ int Buffer::find_line(int offset) {
     if(line_map[current_head_line] == offset)
         return current_head_line;
 
-    while(left || right < line_map_size) {
+    while(left || right < max_line) {
 
         if(left > 0)
             if(line_map[--left] == offset)
                 return left;
 
-        if(right < line_map_size)
+        if(right < max_line)
             if(line_map[++right] == offset)
                 return right;
 
@@ -108,7 +108,7 @@ int Buffer::find_head_line(int offset) {
     if(line_map[current_head_line] == offset)
         return current_head_line;
 
-    while(left || right < line_map_size) {
+    while(left || right < max_line) {
 
         if(left > 0)
             if(line_map[--left] == offset) {
@@ -116,7 +116,7 @@ int Buffer::find_head_line(int offset) {
                 return left;
             }
 
-        if(right < line_map_size)
+        if(right < max_line)
             if(line_map[++right] == offset) {
                 current_head_line = right;
                 return right;
@@ -537,10 +537,10 @@ bool Buffer::batch_delete(bool is_cut) {
 
         auto it_start = my_table.batch_start.first;
 
-        while(it_start != my_table.piece_map.end()){
+        while(it_start != my_table.piece_map.begin()){
             if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
                 break;
-            it_start++;
+            it_start--;
         }
 
         int start_line = find_line(it_start->offset) + 1;
@@ -562,11 +562,14 @@ bool Buffer::batch_delete(bool is_cut) {
         }while(it++ != my_table.batch_end.first);
 
         if(c_lines) {
-            memmove(line_map + start_line, line_map + start_line + c_lines, sizeof(int) * max_line);
+
+            memmove(line_map + start_line, line_map + start_line + c_lines, sizeof(int) * (max_line - start_line + c_lines));
             max_line -= c_lines;
+            memset(line_map + max_line + 1, -1, sizeof(int) * (line_map_size - (max_line+1)));
+
         }
 
-        for(int i = 0; i < 100; i++)
+        for(int i = 0; i < 50; i++)
             std::cout << "line " << i << " offset " << line_map[i] << "\n";
 
         std::cout << "Max Line " << max_line << "\n";
@@ -598,15 +601,46 @@ void Buffer::Undo() {
     shift_control();
 
     if(my_table.undo_list.size()) {
-            if(!my_table.buffer.substr(my_table.undo_list.back().piece.offset, 2).compare("\r\n")) {
-                if(my_table.undo_list.back().type == my_table.INSERT) {
 
-                    std::cout << "The line is " <<find_line(my_table.undo_list.back().piece.offset) << "\n";
+            if(my_table.undo_list.back().type == my_table.INSERT) {
+                if(!my_table.buffer.substr(my_table.undo_list.back().piece.offset, 2).compare("\r\n")) {
+
+
+                    std::cout << "[INSERT] The line is " <<find_line(my_table.undo_list.back().piece.offset) << "\n";
 
                     int start_line = find_line(my_table.undo_list.back().piece.offset);
 
-                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * max_line);
+                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line + 1));
                     max_line--;
+
+                    for(int i = 0; i < 10; i++)
+                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+                    std::cout << "Max Line " << max_line << "\n";
+                }
+
+            }else {
+
+                int _undo_size = my_table.undo_list.size();
+                int deleted_offset = (int) my_table.undo_list[_undo_size - 2].piece.offset;
+
+                if(!my_table.buffer.substr(deleted_offset, 2).compare("\r\n")) {
+
+                    auto it_start = my_table.deleted_list[my_table.undo_list.back().piece.offset];
+
+                    while(it_start != my_table.piece_map.begin()){
+                        if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+                            break;
+                        it_start--;
+                    }
+
+                    int start_line = find_line(it_start->offset) + 1;
+                    std::cout << "[DELETE] The line is " << start_line << "\n";
+
+                    max_line++;
+                    memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - start_line));
+
+                    line_map[start_line] = deleted_offset;
 
                     for(int i = 0; i < 10; i++)
                         std::cout << "line " << i << " offset " << line_map[i] << "\n";
@@ -615,7 +649,6 @@ void Buffer::Undo() {
 
                 }
             }
-
     }
 
     my_table.undo();
@@ -633,6 +666,64 @@ void Buffer::Redo() {
     }
 
     shift_control();
+
+    if(my_table.redo_list.size()) {
+
+        if(my_table.redo_list.back().type == my_table.INSERT) {
+
+            int deleted_offset = (int) my_table.redo_list.back().piece.offset;
+
+            if(!my_table.buffer.substr(deleted_offset, 2).compare("\r\n")) {
+
+                auto it_start = my_table.piece_map.begin();
+
+                if(my_table.redo_list.back().Pos)
+                    it_start = my_table.deleted_list[my_table.redo_list.back().offset];
+
+                while(it_start != my_table.piece_map.begin()){
+                    if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+                        break;
+                    it_start--;
+                }
+
+                int start_line = find_line(it_start->offset) + 1;
+                std::cout << "[REDO INSERT] The line is " << start_line << "\n";
+
+                max_line++;
+                memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - start_line));
+
+                line_map[start_line] = deleted_offset;
+
+                for(int i = 0; i < 10; i++)
+                    std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+                std::cout << "Max Line " << max_line << "\n";
+
+            }
+
+
+        } else {
+
+            if(!my_table.buffer.substr(my_table.redo_list.back().offset, 2).compare("\r\n")) {
+
+                    std::cout << "[REDO DELETE] The line is " << find_line(my_table.redo_list.back().offset) << "\n";
+
+                    int start_line = find_line(my_table.redo_list.back().offset);
+
+                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line + 1));
+                    max_line--;
+
+                    for(int i = 0; i < 10; i++)
+                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+                    std::cout << "Max Line " << max_line << "\n";
+
+            }
+
+
+        }
+
+    }
 
     my_table.redo();
     find_page();
@@ -707,17 +798,17 @@ void Buffer::Paste() {
 
         auto it_start = my_table.it;
 
-        while(it_start != my_table.piece_map.end()){
+        while(it_start != my_table.piece_map.begin()){
             if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
                 break;
-            it_start++;
+            it_start--;
         }
 
         int start_line = find_line(it_start->offset) + 1;
 
         max_line += copy_line_len;
 
-        memmove(line_map + start_line + copy_line_len, line_map + start_line, sizeof(int) * max_line);
+        memmove(line_map + start_line + copy_line_len, line_map + start_line, sizeof(int) * (max_line - start_line));
 
         int line_count = start_line;
 
@@ -726,7 +817,6 @@ void Buffer::Paste() {
             my_table.insert_text(my_table.batch_buffer.substr(pos, UTF8_CHAR_LEN(my_table.batch_buffer[pos])));
             if(!my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n"))
                  line_map[line_count++] = my_table.it->offset;
-
         }
 
 
@@ -780,9 +870,27 @@ void Buffer::Return() {
     batch_delete(false);
     shift_control();
 
+    auto it_start = my_table.it;
+
+    while(it_start != my_table.piece_map.begin()){
+        if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+            break;
+        it_start--;
+    }
+
+    int start_line = find_line(it_start->offset) + 1;
+    max_line++;
+    memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - start_line));
+
+
     my_table.insert_text("\r\n");
 
-    insert_line(1, (int) my_table.it->offset);
+    line_map[start_line] = my_table.it->offset;
+
+    for(int i = 0; i < 10; i++)
+        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+    std::cout << "Max Line " << max_line << "\n";
 
     find_cursor();
 
@@ -821,8 +929,16 @@ void Buffer::Back_Space() {
             cr1.y = page_upwards();
 
         if(my_table.it != my_table.piece_map.begin())
-            if(!my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n"))
-                remove_line(1,0);
+            if(!my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n")) {
+                    int start_line = find_line(my_table.it->offset);
+                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line + 1));
+                    max_line--;
+
+                    for(int i = 0; i < 50; i++)
+                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+
+                    std::cout << "Max Line " << max_line << "\n";
+            }
 
         if(my_table.delete_text(false)) {
 
