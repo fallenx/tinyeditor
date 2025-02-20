@@ -46,17 +46,14 @@ class Buffer {
     void find_x(__cursor *);
     bool batch_delete(bool);
     void prepare_font_atlas();
-    void update_line_numbers();
     void shift_control();
-    void insert_line(int, int);
-    void remove_line(int, int);
     int find_head_line(int);
     int find_line(int);
 
 public:
 
     Buffer(const char*,int, int);
-    ~Buffer() { SDL_FreeSurface(screen); SDL_FreeSurface(font_atlas); SDL_FreeSurface(Cursor); SDL_FreeSurface(Temp_Surface); SDL_FreeSurface(font_atlas_reverse); free(line_map); }
+    ~Buffer();
     void Render();
     void Cursor_Blink();
     void Undo();

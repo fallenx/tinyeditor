@@ -1,5 +1,14 @@
 #include "Buffer.hpp"
 
+Buffer::~Buffer() {
+     SDL_FreeSurface(screen);
+     SDL_FreeSurface(font_atlas);
+     SDL_FreeSurface(Cursor);
+     SDL_FreeSurface(Temp_Surface);
+     SDL_FreeSurface(font_atlas_reverse);
+     free(line_map);
+}
+
 Buffer::Buffer(const char* BufferName, int _width, int _height) {
 
     if((strlen(BufferName) + 1) <= 250)
@@ -31,10 +40,9 @@ Buffer::Buffer(const char* BufferName, int _width, int _height) {
     blink_on = true;
     dest_rect = {cr1.x, cr1.y, _cur_width, _cur_height};
 
-    line_map_size = 1000000;
+    line_map_size = 65536;
 
     line_map = (int*) malloc(line_map_size * sizeof(int));
-    memset(line_map, -1, line_map_size * sizeof(int));
     line_map[0] = 0;
 
 
@@ -78,19 +86,36 @@ void Buffer::set_shift(bool pressed) {
 
 int Buffer::find_line(int offset) {
 
+    //int left = 0;
+    //int right = max_line + 1;
+
     int left = current_head_line;
     int right = current_head_line;
 
-    if(line_map[current_head_line] == offset)
+    if(!offset)
+        return 0;
+    else if(line_map[current_head_line] == offset)
         return current_head_line;
+/*
+    while(++left <= --right) {
 
-    while(left || right < max_line) {
+        if(line_map[left] == offset)
+                return left;
+
+        if(line_map[right] == offset)
+                return right;
+
+    }
+
+*/
+
+    while(left || right <= max_line) {
 
         if(left > 0)
             if(line_map[--left] == offset)
                 return left;
 
-        if(right < max_line)
+        if(right <= max_line)
             if(line_map[++right] == offset)
                 return right;
 
@@ -105,10 +130,12 @@ int Buffer::find_head_line(int offset) {
     int left = current_head_line;
     int right = current_head_line;
 
-    if(line_map[current_head_line] == offset)
+    if(!offset)
+        return 0;
+    else if(line_map[current_head_line] == offset)
         return current_head_line;
 
-    while(left || right < max_line) {
+    while(left || right <= max_line) {
 
         if(left > 0)
             if(line_map[--left] == offset) {
@@ -116,7 +143,7 @@ int Buffer::find_head_line(int offset) {
                 return left;
             }
 
-        if(right < max_line)
+        if(right <= max_line)
             if(line_map[++right] == offset) {
                 current_head_line = right;
                 return right;
@@ -126,74 +153,6 @@ int Buffer::find_head_line(int offset) {
     return -1;
 }
 
-
-void Buffer::remove_line(int len, int offset) {
-
-    int line_count = current_head_line;
-
-
-    for(auto it = my_table.head; it != my_table.it; ++it) {
-        if(!my_table.buffer.substr(it->offset, UTF8_CHAR_LEN(my_table.buffer[it->offset])).compare("\r\n"))
-            line_count++;
-    }
-
-    memmove(line_map + line_count, line_map + line_count + len, sizeof(int) * max_line);
-
-    max_line--;
-
-    for(int i = 0; i < 10; i++)
-        std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-    std::cout << "Max Line " << max_line << "\n";
-
-}
-
-void Buffer::insert_line(int len, int offset) {
-
-    int line_count = current_head_line;
-
-
-    for(auto it = my_table.head; it != my_table.it; ++it) {
-        if(!my_table.buffer.substr(it->offset, UTF8_CHAR_LEN(my_table.buffer[it->offset])).compare("\r\n"))
-            line_count++;
-    }
-
-
-    bool needs_update = false;
-
-    if(++max_line == line_map_size)
-        needs_update = true;
-
-    if(needs_update) {
-        std::cout << "needs update\n";
-    }
-
-
-    memmove(line_map + line_count + len, line_map + line_count, sizeof(int) * max_line);
-
-
-    line_map[line_count] = offset;
-
-    for(int i = 0; i < 10; i++)
-        std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-    std::cout << "Max Line " << max_line << "\n";
-
-
-}
-
-void Buffer::update_line_numbers() {
-
-    size_t line_count = my_table.line_map[my_table.head->offset];
-
-    auto it = my_table.head;
-
-    do {
-        if(!my_table.buffer.substr(it->offset, UTF8_CHAR_LEN(my_table.buffer[it->offset])).compare("\r\n"))
-            my_table.line_map[it->offset] = line_count++;
-    }while(it++ != my_table.it);
-
-}
 
 void Buffer::prepare_font_atlas() {
 
@@ -273,11 +232,6 @@ void Buffer::Render() {
 
     //SDL_FillRect(screen, &line_rect, SDL_MapRGBA(screen->format, 30, 32, 36, 255));
 
-    //std::cout << "Offset = " << my_table.head->offset << " Head Line " << find_head_line((int) my_table.head->offset) << "\n";
-
-    //std::cout << "Head offset " << my_table.head->offset << "\n";
-
-    //size_t _line_count = my_table.line_map[my_table.head->offset];
     size_t _line_count = find_head_line((int) my_table.head->offset);
 
     std::string _linec = std::to_string(_line_count);
@@ -340,7 +294,6 @@ void Buffer::Render() {
                 t_y += _cur_height;
                 t_x = line_offset + x_offset;
 
-                //my_table.line_map[it->offset] = _line_count;
                 _linec = std::to_string(++_line_count);
 
                 for(size_t i = 0; i < _linec.size(); i++) {
@@ -501,21 +454,18 @@ void Buffer::page_downwards() {
 
 void Buffer::find_page() {
 
-    __cursor to_find = find_cursor();
+    find_page_head();
 
-    if(to_find.y > (t_height - _cur_height)) {
+    __cursor to_find = {0, -_cur_height};
 
-       find_page_head();
+   to_find.y = -_cur_height;
 
-       to_find.y = -_cur_height;
+   while(to_find.y < _height>>1 && my_table.head != my_table.piece_map.begin()) {
+        to_find.y = page_upwards();
+        to_find = find_cursor();
+   }
 
-       while(to_find.y < _height>>1 && my_table.head != my_table.piece_map.begin()) {
-            to_find.y = page_upwards();
-            to_find = find_cursor();
-       }
-
-       to_find = find_cursor();
-    }
+   to_find = find_cursor();
 
     find_x(&to_find);
 
@@ -527,54 +477,75 @@ void Buffer::find_page() {
 
 bool Buffer::batch_delete(bool is_cut) {
 
-    if(is_cut)
+    if(is_cut) {
         my_table.batch_buffer.clear();
+        copy_line_len = 0;
+    }
 
     if(my_table.batch_start.first != my_table.batch_end.first || (my_table.batch_start.first == my_table.batch_end.first && my_table.batch_start.second != my_table.batch_end.second)) {
 
         my_table.it = my_table.batch_end.first;
         my_table.Pos = my_table.batch_end.second;
 
-        auto it_start = my_table.batch_start.first;
-
-        while(it_start != my_table.piece_map.begin()){
-            if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
-                break;
-            it_start--;
-        }
-
-        int start_line = find_line(it_start->offset) + 1;
-        int c_lines = 0;
-
         auto it = my_table.batch_start.first;
-        size_t batch_length = 0;
+        int batch_length = 0;
+
+        int c_lines = 0;
 
         do {
             size_t length = (it == my_table.batch_end.first) ? my_table.batch_end.second : it->length;
             size_t s_pos = (it == my_table.batch_start.first) ? my_table.batch_start.second : 0;
             for(size_t t_pos = s_pos; t_pos < length; t_pos += UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos])) {
-                if(!my_table.buffer.substr(it->offset, 2).compare("\r\n"))
+                if(!my_table.buffer.substr(it->offset, 2).compare("\r\n")) {
                     c_lines++;
+                    if(is_cut)
+                        copy_line_len++;
+                }
                 batch_length++;
                 if(is_cut)
                     my_table.batch_buffer += my_table.buffer.substr(it->offset + t_pos, UTF8_CHAR_LEN(my_table.buffer[it->offset + t_pos]));
             }
         }while(it++ != my_table.batch_end.first);
 
+
+
         if(c_lines) {
 
-            memmove(line_map + start_line, line_map + start_line + c_lines, sizeof(int) * (max_line - start_line + c_lines));
+
+            auto it_start = my_table.batch_start.first;
+
+            while(it_start != my_table.piece_map.begin()){
+                if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+                    break;
+                it_start--;
+            }
+
+            int start_line = find_line(it_start->offset) + 1;
+
+            if(max_line > (start_line + c_lines - 1))
+                memmove(line_map + start_line, line_map + start_line + c_lines, sizeof(int) * (max_line - (start_line + c_lines - 1)));
+
             max_line -= c_lines;
-            memset(line_map + max_line + 1, -1, sizeof(int) * (line_map_size - (max_line+1)));
+
+            ///check the line map for corrupt insertion
+            /*
+            if(line_map[0])
+                std::cout << "[BATCH] corruption at " << 0 << "\n";
+            for(int i = 1 ; i < max_line; i++)
+                if(!line_map[i])
+                    std::cout << "[BATCH] corruption at " << i << "\n";
+
+
+            for(int i = 0; i < 20; i++)
+                std::cout << "Line " << i << " " <<line_map[i] << "\n";
+            std::cout << "Max Line " << max_line << "\n";
+
+            */
 
         }
 
-        for(int i = 0; i < 50; i++)
-            std::cout << "line " << i << " offset " << line_map[i] << "\n";
 
-        std::cout << "Max Line " << max_line << "\n";
-
-        while(batch_length--)
+        for(;batch_length > 0; --batch_length)
             my_table.delete_text(false);
 
         find_page();
@@ -602,53 +573,56 @@ void Buffer::Undo() {
 
     if(my_table.undo_list.size()) {
 
-            if(my_table.undo_list.back().type == my_table.INSERT) {
-                if(!my_table.buffer.substr(my_table.undo_list.back().piece.offset, 2).compare("\r\n")) {
+        if(my_table.undo_list.back().type == my_table.INSERT) {
+            if(!my_table.buffer.substr(my_table.undo_list.back().piece.offset, 2).compare("\r\n")) {
 
+                int start_line = find_line(my_table.undo_list.back().piece.offset);
+                if(max_line > start_line)
+                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line));
+                max_line--;
 
-                    std::cout << "[INSERT] The line is " <<find_line(my_table.undo_list.back().piece.offset) << "\n";
-
-                    int start_line = find_line(my_table.undo_list.back().piece.offset);
-
-                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line + 1));
-                    max_line--;
-
-                    for(int i = 0; i < 10; i++)
-                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-                    std::cout << "Max Line " << max_line << "\n";
-                }
-
-            }else {
-
-                int _undo_size = my_table.undo_list.size();
-                int deleted_offset = (int) my_table.undo_list[_undo_size - 2].piece.offset;
-
-                if(!my_table.buffer.substr(deleted_offset, 2).compare("\r\n")) {
-
-                    auto it_start = my_table.deleted_list[my_table.undo_list.back().piece.offset];
-
-                    while(it_start != my_table.piece_map.begin()){
-                        if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
-                            break;
-                        it_start--;
-                    }
-
-                    int start_line = find_line(it_start->offset) + 1;
-                    std::cout << "[DELETE] The line is " << start_line << "\n";
-
-                    max_line++;
-                    memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - start_line));
-
-                    line_map[start_line] = deleted_offset;
-
-                    for(int i = 0; i < 10; i++)
-                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-                    std::cout << "Max Line " << max_line << "\n";
-
-                }
             }
+
+        }else {
+
+            int _undo_size = my_table.undo_list.size();
+            int deleted_offset = (int) my_table.undo_list[_undo_size - 2].piece.offset;
+
+            if(!my_table.buffer.substr(deleted_offset, 2).compare("\r\n")) {
+
+                auto it_start = my_table.deleted_list[my_table.undo_list.back().piece.offset];
+
+                while(it_start != my_table.piece_map.begin()){
+                    if(!my_table.buffer.substr(it_start->offset, 2).compare("\r\n"))
+                        break;
+                    it_start--;
+                }
+
+                int start_line = find_line(it_start->offset) + 1;
+
+                if(max_line > (start_line - 1))
+                    memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - (start_line - 1)));
+
+                max_line++;
+
+                line_map[start_line] = deleted_offset;
+
+            }
+        }
+
+/*
+
+        for(int i = 0; i < max_line; i++)
+            std::cout << "Line " << i << " " <<line_map[i] << "\n";
+        std::cout << "Max Line " << max_line << "\n";
+
+        ///check the line map for corrupt insertion
+        if(line_map[0])
+            std::cout << "[UNDO] corruption at " << 0 << "\n";
+        for(int i = 1 ; i < max_line; i++)
+            if(!line_map[i])
+                std::cout << "[UNDO] corruption at " << i << "\n";
+*/
     }
 
     my_table.undo();
@@ -687,17 +661,14 @@ void Buffer::Redo() {
                 }
 
                 int start_line = find_line(it_start->offset) + 1;
-                std::cout << "[REDO INSERT] The line is " << start_line << "\n";
+
+                if(max_line > (start_line - 1))
+                    memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - (start_line - 1)));
 
                 max_line++;
-                memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - start_line));
+
 
                 line_map[start_line] = deleted_offset;
-
-                for(int i = 0; i < 10; i++)
-                    std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-                std::cout << "Max Line " << max_line << "\n";
 
             }
 
@@ -706,22 +677,30 @@ void Buffer::Redo() {
 
             if(!my_table.buffer.substr(my_table.redo_list.back().offset, 2).compare("\r\n")) {
 
-                    std::cout << "[REDO DELETE] The line is " << find_line(my_table.redo_list.back().offset) << "\n";
-
                     int start_line = find_line(my_table.redo_list.back().offset);
-
-                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line + 1));
+                    if(max_line > start_line)
+                        memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line));
                     max_line--;
-
-                    for(int i = 0; i < 10; i++)
-                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-                    std::cout << "Max Line " << max_line << "\n";
 
             }
 
 
         }
+
+/*
+
+        for(int i = 0; i < max_line; i++)
+            std::cout << "Line " << i << " " << line_map[i] << "\n";
+        std::cout << "Max Line " << max_line << "\n";
+
+        ///check the line map for corrupt insertion
+        if(line_map[0])
+            std::cout << "[REDO] corruption at " << 0 << "\n";
+        for(int i =1 ; i < max_line; i++)
+            if(!line_map[i])
+                std::cout << "[REDO] corruption at " << i << "\n";
+
+*/
 
     }
 
@@ -796,6 +775,8 @@ void Buffer::Paste() {
 
     if(!my_table.batch_buffer.empty()) {
 
+
+
         auto it_start = my_table.it;
 
         while(it_start != my_table.piece_map.begin()){
@@ -806,12 +787,14 @@ void Buffer::Paste() {
 
         int start_line = find_line(it_start->offset) + 1;
 
+
+        if(max_line > (start_line -1))
+            memmove(line_map + start_line + copy_line_len, line_map + start_line, sizeof(int) * (max_line - (start_line - 1)));
+
         max_line += copy_line_len;
 
-        memmove(line_map + start_line + copy_line_len, line_map + start_line, sizeof(int) * (max_line - start_line));
 
         int line_count = start_line;
-
 
         for(size_t pos = 0; pos < my_table.batch_buffer.size(); pos += UTF8_CHAR_LEN(my_table.batch_buffer[pos])) {
             my_table.insert_text(my_table.batch_buffer.substr(pos, UTF8_CHAR_LEN(my_table.batch_buffer[pos])));
@@ -819,13 +802,21 @@ void Buffer::Paste() {
                  line_map[line_count++] = my_table.it->offset;
         }
 
+/*
 
-        for(int i = 0; i < 10; i++)
-            std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
+        for(int i = 0; i < max_line; i++)
+            std::cout << "Line " << i << " " <<line_map[i] << "\n";
         std::cout << "Max Line " << max_line << "\n";
 
-        //update_line_numbers();
+
+        if(line_map[0])
+            std::cout << "[Paste] corruption at " << 0 << "\n";
+        for(int i =1 ; i < max_line; i++)
+            if(!line_map[i])
+                std::cout << "[Paste] corruption at " << i << "\n";
+
+*/
+
         find_page();
 
     }
@@ -870,6 +861,8 @@ void Buffer::Return() {
     batch_delete(false);
     shift_control();
 
+
+
     auto it_start = my_table.it;
 
     while(it_start != my_table.piece_map.begin()){
@@ -879,18 +872,33 @@ void Buffer::Return() {
     }
 
     int start_line = find_line(it_start->offset) + 1;
-    max_line++;
-    memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - start_line));
 
+
+    if(max_line > (start_line - 1))
+        memmove(line_map + start_line + 1, line_map + start_line, sizeof(int) * (max_line - (start_line - 1)));
+
+    max_line++;
 
     my_table.insert_text("\r\n");
 
     line_map[start_line] = my_table.it->offset;
 
-    for(int i = 0; i < 10; i++)
-        std::cout << "line " << i << " offset " << line_map[i] << "\n";
+/*
 
+    for(int i = 0; i <= 20; i++)
+        std::cout << "Line " << i << " " <<line_map[i] << "\n";
     std::cout << "Max Line " << max_line << "\n";
+
+
+
+    if(line_map[0])
+        std::cout << "[Return] corruption at " << 0 << "\n";
+    for(int i =1 ; i < max_line; i++)
+        if(!line_map[i])
+            std::cout << "[Return] corruption at " << i << "\n";
+
+*/
+
 
     find_cursor();
 
@@ -928,17 +936,29 @@ void Buffer::Back_Space() {
         if(!cr1.y && !x_offset && cr1.x == line_offset)
             cr1.y = page_upwards();
 
-        if(my_table.it != my_table.piece_map.begin())
+        if(my_table.it != my_table.piece_map.begin()) {
             if(!my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n")) {
+
                     int start_line = find_line(my_table.it->offset);
-                    memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line + 1));
+                    if(max_line > start_line)
+                        memmove(line_map + start_line, line_map + start_line + 1, sizeof(int) * (max_line - start_line));
                     max_line--;
 
-                    for(int i = 0; i < 50; i++)
-                        std::cout << "line " << i << " offset " << line_map[i] << "\n";
-
-                    std::cout << "Max Line " << max_line << "\n";
             }
+
+            /*
+            if(line_map[0])
+                std::cout << "[Back_Space] corruption at " << 0 << "\n";
+            for(int i =1 ; i < max_line; i++)
+                if(!line_map[i])
+                    std::cout << "[Back_Space] corruption at " << i << "\n";
+
+            */
+
+
+
+        }
+
 
         if(my_table.delete_text(false)) {
 
@@ -1134,27 +1154,34 @@ void Buffer::PageDown() {
         }
 
 
-        if(page_passed && cr1.y > old_cr.y) {
+        if(page_passed && cr1.y >= old_cr.y) {
 
-            my_table.left();
+                if(cr1.x == old_cr.x || !my_table.buffer.substr(my_table.it->offset, 2).compare("\r\n")) {
 
-            if(my_table.it == my_table.batch_end.first && my_table.Pos == my_table.batch_end.second)
-                is_continue = true;
+/*
+                    my_table.left();
 
-            if(shift_pressed) {
-                if(is_continue)
-                    my_table.batch_end = {my_table.it, my_table.Pos};
-                else
-                    my_table.batch_start = {my_table.it, my_table.Pos};
+                    if(my_table.it == my_table.batch_end.first && my_table.Pos == my_table.batch_end.second)
+                        is_continue = true;
+
+                    if(shift_pressed) {
+                        if(is_continue)
+                            my_table.batch_end = {my_table.it, my_table.Pos};
+                        else
+                            my_table.batch_start = {my_table.it, my_table.Pos};
+                    }
+
+                    cr1 = find_cursor();
+
+*/
+
+                    break;
+
             }
 
-            cr1 = find_cursor();
-
-            break;
         }
 
-        if(page_passed && cr1.x == old_cr.x && cr1.y == old_cr.y)
-           break;
+
 
     }
 
